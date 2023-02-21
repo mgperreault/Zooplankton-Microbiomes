@@ -603,9 +603,3 @@ Bac.Phyla.stacked.bar1
 ggsave(filename = "figures/Bac.Phyla.stacked.bar1.pdf", plot = Bac.Phyla.stacked.bar1, height=5.5, width=10)
 ```
 
-```{r linear models for environ. data}
-
-
-
-```
-
