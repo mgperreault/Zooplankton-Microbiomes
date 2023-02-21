@@ -43,7 +43,7 @@ str(metadata)
 table(metadata$organism)
 
 # set row names
-row.names(metadata)<-metadata$X 
+row.names(metadata)<-metadata$X
 
 
 # factors

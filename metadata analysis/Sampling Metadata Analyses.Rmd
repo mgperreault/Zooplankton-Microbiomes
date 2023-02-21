@@ -1,0 +1,250 @@
+---
+title: "Sampling Metadata Analyses"
+output: html_document
+date: "2022-12-11"
+---
+
+
+
+
+```{r}
+#TDN ------------
+
+library(ggplot2)
+
+read.csv("MP_sampling_data.csv",header = TRUE)
+lakeTN.df<-read.csv("MP_sampling_data.csv",header = TRUE)
+lakeTN.df$TDN..ug.L<-as.numeric(lakeTN.df$TDN..ug.L)
+lakeTN.df$Lake<-as.factor(lakeTN.df$Lake)
+lakeTN.df$Time.Point<-as.factor(lakeTN.df$Time.Point)
+
+str(lakeTN.df)
+
+TN.plot <- ggplot(lakeTN.df, aes(x=Time.Point, y=TDN..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab(expression(paste("TDN", ~(mu*g~L^-1), sep = "")))
+
+TN.plot
+dev.print(pdf, "figures/TN.plot.pdf")
+dev.off
+```
+```{r}
+#TDP ---------------
+
+read.csv("MP_sampling_data.csv",header = TRUE)
+lakeTP.df<-read.csv("MP_sampling_data.csv",header = TRUE)
+lakeTP.df$TDP..ug.L<-as.numeric(lakeTP.df$TDP..ug.L)
+lakeTP.df$Lake<-as.factor(lakeTP.df$Lake)
+lakeTP.df$Time.Point<-as.factor(lakeTP.df$Time.Point)
+
+str(lakeTP.df)
+
+TP.plot<-ggplot(lakeTP.df, aes(x=Time.Point, y=TDP..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab(expression(paste("TDP", ~(mu*g~L^-1), sep = "")))
+
+TP.plot
+dev.print(pdf, "figures/TP.plot.pdf")
+dev.off
+```
+
+```{r}
+#DOC -------------------
+require(MASS)
+require(scales)
+
+read.csv("MP_sampling_data.csv",header = TRUE)
+lakeDOC.df<-read.csv("MP_sampling_data.csv",header = TRUE)
+lakeDOC.df$DOC_values<-as.numeric(lakeDOC.df$DOC_values)
+lakeDOC.df$Lake<-as.factor(lakeDOC.df$Lake)
+lakeDOC.df$Time.Point<-as.factor(lakeDOC.df$Time.Point)
+
+str(lakeDOC.df)
+
+log.DOC.plot<-ggplot(lakeDOC.df, aes(x=Time.Point, y=DOC_values, group=Lake, color=Lake)) +
+  scale_y_log10() + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + 
+  xlab("Sampling Time Point") + ylab(expression(paste("log(DOC)", ~(mg~L^-1), sep = "")))
+
+
+log.DOC.plot
+dev.print(pdf, "figures/log.DOC.plot.pdf")
+dev.off
+```
+
+
+
+```{r}
+#lake chl-a --------------------------
+
+read.csv('MP_chlorophyll.csv',header = TRUE)
+chla.df<-read.csv('MP_chlorophyll.csv',header = TRUE)
+
+chla.df$Time.Sample<-as.factor(chla.df$Time.Sample)
+chla.df$Lake<-as.factor(chla.df$Lake)
+
+str(chla.df)
+
+chla.df$Chlorophyll.1..ug.L<-as.numeric(chla.df$Chlorophyll.1..ug.L)
+
+chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chlorophyll-a", ~(mu*g~ L^-1), sep = "")))
+
+chla.plot
+dev.print(pdf, "figures/chla.plot.pdf")
+dev.off
+
+```
+
+
+```{r}
+#lake dissolved oxygen (percent) ---------------
+
+read.csv('MP_sampling_data.csv', header= TRUE)
+lakeDO.df<-read.csv('MP_sampling_data.csv', header= TRUE)
+
+lakeDO.df$DO..perc<-as.numeric(lakeDO.df$DO..perc)
+lakeDO.df$Lake<-as.factor(lakeDO.df$Lake)
+lakeDO.df$Time.Point<-as.factor(lakeDO.df$Time.Point)
+
+str(lakeDO.df)
+
+DO.percent.plot<-ggplot(lakeDO.df, aes(x=Time.Point, y=DO..perc, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("DO (%)")
+
+DO.percent.plot
+dev.print(pdf, "figures/DO.percent.plot.pdf")
+dev.off
+
+
+```
+```{r}
+#lake conductivity ------------
+
+read.csv('MP_sampling_data.csv', header= TRUE)
+lakeCond.df<-read.csv('MP_sampling_data.csv', header= TRUE)
+
+lakeCond.df$cond<-as.numeric(lakeCond.df$cond)
+lakeCond.df$Lake<-as.factor(lakeCond.df$Lake)
+lakeCond.df$Time.Point<-as.factor(lakeCond.df$Time.Point)
+
+str(lakeCond.df)
+
+conductivity.plot<-ggplot(lakeCond.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("Conductivity(S)")
+
+conductivity.plot
+dev.print(pdf, "figures/conductivity.plot.pdf")
+dev.off
+```
+```{r}
+#lake specific conductivity --------------
+
+read.csv('MP_sampling_data.csv', header= TRUE)
+lake_spc.df<-read.csv('MP_sampling_data.csv', header= TRUE)
+
+lake_spc.df$cond<-as.numeric(lake_spc.df$spc)
+lake_spc.df$Lake<-as.factor(lake_spc.df$Lake)
+lake_spc.df$Time.Point<-as.factor(lake_spc.df$Time.Point)
+
+str(lake_spc.df)
+
+spc.plot <- ggplot(lake_spc.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + ylab(expression(paste("spc", ~(mu*S~ cm^-1)))) + xlab("Sampling Time Point") + ylab("spc")
+
+spc.plot
+dev.print(pdf, "figures/spc.plot.pdf")
+dev.off
+```
+
+```{r}
+#lake pH -------------------------
+
+read.csv('MP_sampling_data.csv', header= TRUE)
+lakepH.df<-read.csv('MP_sampling_data.csv', header= TRUE)
+
+lakepH.df$pH<-as.numeric(lakepH.df$pH)
+lakepH.df$Lake<-as.factor(lakepH.df$Lake)
+lakepH.df$Time.Point<-as.factor(lakepH.df$Time.Point)
+
+str(lakepH.df)
+
+pH.plot<-ggplot(lakepH.df, aes(x=Time.Point, y=pH, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point")
+
+pH.plot
+dev.print(pdf, "figures/pH.plot.pdf")
+dev.off
+```
+
+
+```{r}
+#lake total alkalinity --------------
+
+read.csv('MP_sampling_data.csv', header= TRUE)
+lakeTA.df<-read.csv('MP_sampling_data.csv', header= TRUE)
+
+lakeTA.df$TA..mg.L<-as.numeric(lakeTA.df$TA..mg.L)
+lakeTA.df$Lake<-as.factor(lakeTA.df$Lake)
+lakeTA.df$Time.Point<-as.factor(lakeTA.df$Time.Point)
+
+str(lakeTA.df)
+
+TotalAlkalinity.plot<-ggplot(lakeTA.df, aes(x=Time.Point, y=TA..mg.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") +  ylab("Total Alkalinity (mg/L)")
+
+TotalAlkalinity.plot
+dev.print(pdf,"figures/TotalAlkalinity.plot.pdf")
+dev.off
+```
+
+
+
+
+
+```{r}
+#lake surface temperature -------------------------------
+
+read.csv('MP_sampling_data.csv',header = TRUE)
+laketemp.df<- read.csv('MP_sampling_data.csv',header = TRUE)
+
+laketemp.df$temp..C<-as.numeric(laketemp.df$temp..C)
+laketemp.df$Time.Point<-as.factor(laketemp.df$Time.Point)
+laketemp.df$Lake<-as.factor(laketemp.df$Lake)
+
+str(laketemp.df)
+
+laketemp.plot<-ggplot(laketemp.df, aes(x=Time.Point, y=temp..C, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("Temperature (°C)")
+
+
+laketemp.plot
+dev.print(pdf, "figures/laketemp.plot.pdf")
+dev.off
+```
+
+
+```{r}
+
+#create a plot that includes all individual plots into one grid (condense all above plots into one figure)
+
+install.packages("patchwork")
+library("patchwork")
+library("ggpubr")
+
+chla.plot + DO.percent.plot + conductivity.plot + pH.plot + laketemp.plot + TotalAlkalinity.plot + TN.plot + TP.plot + DOC.plot + plot_layout(guides="collect") 
+
+ggarrange(DOC.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), chla.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), DO.percent.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), conductivity.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), pH.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), laketemp.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), TP.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), TN.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), plot_layout(guides="collect"), labels=NULL, common.legend = TRUE, legend="bottom", align="hv", font.label = list(size=10, color="black", family=NULL, position="top", labels="auto"))
+
+dev.print(pdf, "figures/combined.plot.pdf")
+dev.off
+```
+
+```{r}
+# ggarrange ------------------------
+
+install.packages("patchwork")
+library("patchwork")
+library("ggpubr")
+
+
+log.DOC.plot + DO.percent.plot + pH.plot + laketemp.plot + plot_layout(guides="collect")
+
+
+ggarrange(log.DOC.plot, DO.percent.plot, pH.plot, laketemp.plot, label.x = "Sampling Time Point", common.legend = TRUE, legend="bottom", nrow = 2, ncol = 2)
+
+dev.print(pdf, "Figures/combined.plot.pdf")
+dev.off
+```
+
+
+
+
