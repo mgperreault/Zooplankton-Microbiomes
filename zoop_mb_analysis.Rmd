@@ -13,6 +13,7 @@ library("cowplot")
 library("gridExtra")
 library("ggpubr")
 library("dplyr")
+library("doBy")
 
 # use pacman to load CRAN packages missing
 pacman::p_load('knitr', 'tidyverse', 'knitr', 'magrittr', 'effects', 'devtools',
@@ -25,12 +26,15 @@ library("microbiome")
 
 devtools::install_github("microbiome/mia")
 library("mia")
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("DESeq2")
 ```
 
 
 ```{r loading in data and modifying metadata}
-
-getwd()
 
 # load in CSV files for phyloseq object
 metadata <- read.csv('phyloseq analysis/metadata_mp.csv')
@@ -43,7 +47,7 @@ str(metadata)
 table(metadata$organism)
 
 # set row names
-row.names(metadata)<-metadata$X
+row.names(metadata) <- metadata$X
 
 
 # factors
@@ -117,6 +121,7 @@ df.fin$Index <- seq(nrow(df.fin))
 
 ########### now we have final phyloseq object with correct metadata 
 saveRDS(PS.fin, file="phyloseq analysis/output/PS.fin.rds")
+PS.fin <- readRDS("phyloseq analysis/output/PS.fin.rds")
 
 
 # Make a data frame with a column for the read counts of each sample
@@ -146,6 +151,14 @@ richness.plot
 dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=4, width=12)
 dev.off() 
 
+
+#richness by organism (or sample type i.e, water)
+richness.plot <- plot_richness(PS.fin, x="phy_group", measures=c("Observed", "Shannon")) + theme_bw() + geom_boxplot()
+richness.plot
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=4, width=12)
+dev.off() 
+
+
 #richness by Time.point
 richness.plot<-plot_richness(PS.fin, x="time_point", measures=c("Observed", "Shannon")) + theme_bw()
 richness.plot
@@ -173,7 +186,7 @@ dev.off()
 ```{r Read counts and rarefaction curves}
 
 # Histogram of sample read counts
-hist.depth<-ggplot(sample_sum_df, aes(x = read.sum)) + 
+hist.depth <- ggplot(sample_sum_df, aes(x = read.sum)) + 
   geom_histogram(color = "black", fill = "gold2", binwidth = 2500) +
   ggtitle("Distribution of sample sequencing depth") + 
   xlab("Read counts") +
@@ -210,6 +223,45 @@ dev.off()
 ```
 
 
+```{r ASV Richness and Diversity Plots}
+rich <- richness(ASV_table, index="observed")
+div <- diversity(ASV_table, index="shannon")
+div <- cbind(rich, div)
+div$sequence_ID <- rownames(div)
+
+div <- merge(div, metadata[,c(1,7,8,9,20)], by="sequence_ID", all=T)
+sum_div <- summaryBy(shannon~phy_group*lake*time_point, data = div, FUN = c(mean, sd))
+
+m1 <- lm(shannon~time_point*lake*phy_group, data=div)
+anova(m1)
+
+ggplot(sum_div, aes(x=time_point, y=shannon.mean, fill=lake, color=lake))+
+  facet_grid(rows="phy_group")+
+  geom_point()+
+  geom_line(wt=2)
+
+
+######### now using the rarefied phyloseq object
+
+rich_rare <- richness(physeq.rare500, index="observed")
+div_rare <- diversity(physeq.rare500, index="shannon")
+div_rare <- cbind(rich_rare, div_rare)
+div_rare$sequence_ID <- rownames(div_rare)
+
+div_rare <- merge(div_rare, metadata_500[,c(1,7,8,9,20)], by="sequence_ID", all=T)
+div_agg2 <- summaryBy(shannon~phy_group*lake*time_point, data = div, FUN = mean)
+
+m1 <- lm(shannon~time_point*lake*phy_group, data=div_rare)
+anova(m1)
+
+ggplot(div, aes(x=time_point, y=shannon, fill=phy_group, color=phy_group))+
+  facet_grid(rows="lake")+
+  geom_point()+
+  geom_line(wt=2)
+
+
+
+```
 
 
 ```{r prevelance of ASVs}
@@ -226,6 +278,20 @@ prevdf = data.frame(Prevalence = prevdf,
 plyr::ddply(prevdf, "Phylum", function(df1){cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
 ```
 
+```{r correlations}
+
+cor(metadata$elevation_m, metadata$DOC)
+ggscatter(metadata, x = "elevation_m", y = "DOC", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "elevation (m)", ylab = "DOC")
+
+cor(metadata$chla_ug.L, metadata$DOC)
+ggscatter(metadata, x = "chla_ug.L", y = "DOC", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "chla", ylab = "DOC")
+```
 
 
 ```{r rarefy}
@@ -237,7 +303,7 @@ sort(rowSums(otu_table(t(physeq.rare500))))
 
 # filtering metadata by sample names with 500 reads or more 
 metadata_500 <- as.data.frame(sample_data(physeq.rare500))
-sample_names_500 <- rownames(metadata_500) 
+metadata_500$sequence_ID <- rownames(metadata_500) 
 
 ```
 
@@ -250,6 +316,7 @@ str(ASV_table)
 set.seed(10000)
 avg_bray_500 <- avgdist(t(raw.asv.table), sample = 500, iterations = 1e3)
 ```
+
 
 
 ```{r NMDS plots by time point}
@@ -351,7 +418,8 @@ dev.off()
 
 
 ```{r}
-#### NMDS and PERMANOVAS from distance matrix ####
+#### PERMANOVAS from distance matrix ####
+
 
 set.seed(10000)
 nmds_2 <- metaMDS(avg_bray_500,
@@ -365,10 +433,16 @@ species.scores2 <- as.data.frame(scores(nmds_2, display="site"))
 nmds2.merge <- merge(metadata_500, species.scores2, by = 'row.names', all = TRUE)
 
 nmds2.merge$elev.cat <- as.factor(ifelse(nmds2.merge$elevation_m < 2900, "Below", "Above"))
+nmds2.merge$basin <- as.factor(ifelse(nmds2.merge$lake == 'Eastern Brook' | nmds2.merge$lake == 'Serene' | nmds2.merge$lake == 'Convict', 'South', 
+                                      ifelse(nmds2.merge$lake == 'Cooney'| nmds2.merge$lake == 'Blue' | nmds2.merge$lake == 'Virginia', 'North', NA)))
 
+# running all sorts of PERMANOVAs
+
+broad.model <- adonis2(avg_bray_500 ~ lake*time_point*phy_group, data = nmds2.merge, permutations = 1000)
+broad.model
 
 # model for the factors 
-model.lake <- adonis2(avg_bray_500 ~ nmds2.merge$lake) # not significant :(
+model.lake <- adonis2(avg_bray_500 ~ lake, data = nmds2.merge) # not significant :(
 model.lake
 
 model.time <- adonis2(avg_bray_500 ~ nmds2.merge$time_point) # significant 
@@ -388,7 +462,10 @@ model.type
 
 # models for the numerics
 
-model.temp <- adonis2(avg_bray_500 ~ nmds2.merge$DO_perc)  # not significant :(
+model.DO <- adonis2(avg_bray_500 ~ nmds2.merge$DO_perc)  # not significant :(
+model.DO
+
+model.temp <-adonis2(avg_bray_500 ~ nmds2.merge$temp_C) # not significant :(
 model.temp
 
 model.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC) # significant
@@ -411,7 +488,10 @@ model.elevcat
 
 
 #interactions
-model.phy.by.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC + nmds2.merge$temp_C + nmds2.merge$pH + nmds2.merge$DO_perc) # significant
+model.phy.by.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$time_point) # significant
+model.phy.by.DOC
+
+model.phy.by.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$phy_group) # significant
 model.phy.by.DOC
 
 model.phy.by.time <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group*nmds2.merge$time_point) # significant
@@ -429,30 +509,10 @@ model.chla.by.elev
 model.DOC.by.elev <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$elevation_m) # not significant :(
 model.DOC.by.elev
 
-model.DOC.by.elev <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$lake) # not significant :(
-model.DOC.by.elev
+model.DOC.by.lake <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$lake) # not significant :(
+model.DOC.by.lake
 
-### Combined
-
-model.combined1 <- adonis2(avg_bray_500 ~ nmds2.merge$DOC + nmds2.merge$temp_C 
-                           + nmds2.merge$pH + nmds2.merge$DO_perc + nmds2.merge$time_point 
-                           + nmds2.merge$lake + nmds2.merge$phy_group )
-model.combined1
-
-model.combined2 <- adonis2(avg_bray_500 ~ nmds2.merge$time_point*nmds2.merge$DOC) # significant
-model.combined2
-
-
-Temp. <- nmds2.merge$temp_C
-Elevation <- nmds2.merge$elevation_m
-Chlorophyll <- nmds2.merge$chla_ug.L
-DOC <- nmds2.merge$DOC
-pH <- nmds2.merge$pH
-Sample_Type <- nmds2.merge$sample_type
-Time_Point_Lake <- nmds2.merge$time_point*nmds2.merge$lake
-Phy_Group_Lake <- nmds2.merge$phy_group*nmds2.merge$lake
-Phy_Group_Temp <- nmds2.merge$phy_group*nmds2.merge$temp_C
-Phy_Group_Time_Point <- nmds2.merge$phy_group*nmds2.merge$time_point
+model.DOC.by.phy <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group*nmds2.merge$DOC)
 
 
 
@@ -464,21 +524,52 @@ centroid <- nmds2.merge %>%
   summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
   
 test_nmds <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color=time_point, shape=phy_group), size = 3) + 
+  geom_point(aes(color=time_point), size = 3) + 
   stat_ellipse(level=0.9, linetype = 2, aes(color=time_point)) +
   theme_bw()
 test_nmds
+
+
 ```
 ```{r NMDS phy_group}
 centroid <- nmds2.merge %>% 
   group_by(phy_group) %>%
+  group_by(elev.cat) %>%
   summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
+str(nmds2.merge)
+
   
-test_nmds <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+test_nmds1 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "1"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
   geom_point(aes(color = phy_group), size = 3) + 
-  stat_ellipse(level=0.9, linetype = 2, aes(color=time_point)) +
+  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
   theme_bw()
-test_nmds
+test_nmds1
+
+test_nmds2 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "2"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+  geom_point(aes(color = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
+  theme_bw()
+test_nmds2
+
+test_nmds3 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "3"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+  geom_point(aes(color = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
+  theme_bw()
+test_nmds3
+
+test_nmds4 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "4"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+  geom_point(aes(color = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
+  theme_bw()
+test_nmds4
+
+test_nmds5 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "5"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+  geom_point(aes(color = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
+  theme_bw()
+test_nmds5
+
+
 ```
 ```{r NMDS lake}
 centroid <- nmds2.merge %>% 
@@ -490,6 +581,18 @@ test_nmds <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2, color = lake)) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=lake)) +
   theme_bw()
 test_nmds
+```
+```{r}
+centroid <- nmds2.merge %>% 
+  group_by(elev.cat) %>%
+  summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
+str(nmds2.merge)
+
+test_nmds1 <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2, color = elev.cat)) +
+  geom_point(aes(shape = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=elev.cat)) +
+  theme_bw()
+test_nmds1
 ```
 
 
@@ -601,5 +704,195 @@ Bac.Phyla.stacked.bar1<-
 
 Bac.Phyla.stacked.bar1
 ggsave(filename = "figures/Bac.Phyla.stacked.bar1.pdf", plot = Bac.Phyla.stacked.bar1, height=5.5, width=10)
+```
+
+```{r stacked bar family}
+
+ESV_rel_abund <- transform_sample_counts(PS.fin,function(x) x/sum(x))
+ESV_dataframe<-psmelt(ESV_rel_abund)
+ESV_dataframe$Abundance<- ifelse(ESV_dataframe$Abundance < 1e-2, 0, ESV_dataframe$Abundance)
+
+Abund<-aggregate(Abundance~time_point+lake+organism_water+phy_group+elevation_m+temp_C+Family+Genus+Species, data=ESV_dataframe, FUN=mean)
+
+# by lake and time_point
+stacked1 <- ggplot(data=Abund, aes(x = lake, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+
+stacked1
+dev.copy(pdf, "phyloseq analysis/figures/stacked.pdf", height=7, width=10)
+dev.off() 
+
+###
+
+
+stacked2 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = lake, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  theme(legend.position="bottom") + guides(fill=guide_legend(nrow=7)) +
+  facet_grid(~time_point, scales="free")
+
+# by time_point for Blue
+stacked3 <- ggplot(data=Abund[Abund$lake=="Blue",], aes(x = lake, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+stacked3
+dev.copy(pdf, "phyloseq analysis/figures/stacked3.pdf", height=7, width=10)
+dev.off() 
+
+# by organism_water
+stacked4 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = organism_water, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+
+stacked4
+dev.copy(pdf, "phyloseq analysis/figures/stacked4.pdf", height=7, width=10)
+dev.off() 
+
+stacked5 <- ggplot(data=Abund[Abund$time_point=="2",], aes(x = organism_water, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+
+stacked5
+dev.copy(pdf, "phyloseq analysis/figures/stacked5.pdf", height=7, width=10)
+dev.off() 
+
+stacked6 <- ggplot(data=Abund[Abund$time_point=="3",], aes(x = organism_water, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+
+stacked6
+dev.copy(pdf, "phyloseq analysis/figures/stacked6.pdf", height=7, width=10)
+dev.off() 
+
+stacked7 <- ggplot(data=Abund[Abund$time_point=="4",], aes(x = organism_water, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+
+stacked7
+dev.copy(pdf, "phyloseq analysis/figures/stacked7.pdf", height=7, width=10)
+dev.off() 
+
+
+stacked8 <- ggplot(data=Abund[Abund$time_point=="5",], aes(x = organism_water, y = Abundance), fill = Family) +
+  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free")
+
+stacked8
+dev.copy(pdf, "phyloseq analysis/figures/stacked8.pdf", height=7, width=10)
+dev.off() 
+
+
+```
+
+
+```{r}
+# Using physeq.rare to make community comp figure 
+
+
+# aggregating ASVs by class 
+class_counts_tab <- otu_table(tax_glom(PS.fin, taxrank="Class"))
+class_tax_vec <- as.vector(tax_table(tax_glom(PS.fin, taxrank="Class"))[,"Class"]) 
+rownames(class_counts_tab) <- as.vector(class_tax_vec)
+
+# below is aggregating ASVs by phylum 
+phyla_counts_tab <- otu_table(tax_glom(PS.fin, taxrank="Phylum")) 
+# making rownames phyla 
+phyla_tax_vec <- as.vector(tax_table(tax_glom(PS.fin, taxrank="Phylum"))[,"Phylum"]) 
+rownames(phyla_counts_tab) <- as.vector(phyla_tax_vec)
+
+# now we have a dataframe with the number of reads corresponding for each phylum and class in each sample 
+
+# making a relative abundance df at the phylum level 
+phylum_proportions <- apply(phyla_counts_tab, 2, function(x) x/sum(x))
+
+phylum_proportions <- as.data.frame(phylum_proportions) # making df
+phylum_proportions$Phyla <- row.names(phylum_proportions) # column of phyla
+# check they all add up to 1
+sum(phylum_proportions[,1])
+
+###########
+  
+
+
+  
+##############
+# making data long - sample column, phyla column, relative abundance column 
+phylum_prop_long <- phylum_proportions %>% 
+  pivot_longer(cols = colnames(phylum_proportions[,1:320]), 
+                                    names_to = "sequence_ID", 
+                                    values_to = "rel_abund")
+phylum_prop_long <- as.data.frame(phylum_prop_long)
+str(phylum_prop_long)
+
+# now we have long df with each sample and the rel abundance of phyla 
+```
+
+merging with metadata - specifically site level and elev.cat level 
+```{r}
+# manipulating metadata file: 
+
+comp.metadata <- as.data.frame(metadata[, c(1,4,5,7,9,10,20)])
+
+# merging metadata with phyla df 
+phyla_comp <-  inner_join(phylum_prop_long, comp.metadata, by = "sequence_ID")
+```
+
+# plotting Phylum composition 
+```{r}
+# basic figure of mean relative abundance for above and below treeline
+phyla_comp %>% 
+  group_by(time_point, Phyla) %>% 
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>% 
+  ggplot(aes(x=time_point, y=mean_rel_abund, fill=Phyla)) + 
+  geom_col() + 
+  theme_classic() + 
+  scale_fill_discrete(name = NULL) + 
+  labs(y = "Mean Relative Abundance (%)", x=NULL) + 
+  theme(legend.text = element_text(face = "italic"), 
+        legend.key.size = unit(10, "pt"))
+ggsave("figures/mean_phyla_bar_raw.tiff", width = 5, height = 4)
+
+# we have the basic figure - now we need to make it more appealing 
+
+# making an "other" category and improving figure based on Pat Schloss suggestion
+
+# seeing maximum mean relative abundance of each phyla in above/below groups 
+phyla_mean_rel_abund <- phyla_comp %>% 
+  group_by(time_point, Phyla) %>% 
+  summarize(mean_rel_abund = 100*mean(rel_abund))
+
+max.phyla <- phyla_mean_rel_abund %>% 
+  group_by(Phyla) %>% 
+  summarize(max(mean_rel_abund)) 
+max.phyla <- max.phyla[order(max.phyla$'max(mean_rel_abund)'), decreasing = FALSE]
+
+# we can see our most abundant phyla: Firmicutes, Fusobacteriota, Proteobacteria, Cyanobacteria, Actinobacteriota (maybe)
+
+# pooling everything over 5% using a logical 
+phyla_pool <- phyla_mean_rel_abund %>% 
+  group_by(Phyla) %>% 
+  summarize(pool = max(mean_rel_abund) < 5, 
+            mean = mean(mean_rel_abund)) # this creates a logical of if a phyla meets the condition (is less than 5%)
+
+# join with df and plot! 
+inner_join(phyla_mean_rel_abund, phyla_pool, by = "Phyla") %>% 
+  mutate(Phyla = if_else(pool, "Other", Phyla)) %>%
+  group_by(time_point, Phyla) %>% 
+  summarize(mean_rel_abund = sum(mean_rel_abund),
+            mean = sum(mean)) %>% 
+  mutate(Phyla = factor(Phyla), 
+         Phyla = fct_reorder(Phyla, mean, .desc = TRUE), 
+         Phyla = fct_shift(Phyla, n=1)) %>%
+  ggplot(aes(x=time_point, y=mean_rel_abund, fill=Phyla)) + 
+  geom_col() + 
+  theme_classic() + 
+  scale_fill_manual(name = NULL, 
+                    breaks = c("Cyanobacteria", "Firmicutes", "Fusobacteriota", 
+                               "Proteobacteria", "Other"), 
+                    values = c(brewer.pal(4, "Set1"), "gray")) +
+  labs(y = "Mean Relative Abundance (%)", x=NULL) + 
+  theme(legend.text = element_text(face = "italic"), 
+        legend.key.size = unit(12, "pt"))
+ggsave("figures/phyla_comp_condensed.tiff", height = 4, width = 5)
 ```
 
