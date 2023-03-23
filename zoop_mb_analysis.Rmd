@@ -14,11 +14,15 @@ library("gridExtra")
 library("ggpubr")
 library("dplyr")
 library("doBy")
+library(RColorBrewer)
+library(glue)
+library(ecodist)
+library(geosphere)
 
 # use pacman to load CRAN packages missing
 pacman::p_load('knitr', 'tidyverse', 'knitr', 'magrittr', 'effects', 'devtools',
                'stringi', 'dplyr', "ggplot2", "gridExtra", "dada2", "phyloseq", "vegan",
-               "cowplot", "decontam","BiocManager", "dada2", "microbiome")
+               "cowplot", "decontam","BiocManager", "dada2", "microbiome", "BiocManager")
 
 
 remotes::install_github("microbiome/microbiome")
@@ -49,6 +53,7 @@ table(metadata$organism)
 # set row names
 row.names(metadata) <- metadata$X
 
+metadata$date <- as.Date(metadata$date)
 
 # factors
 metadata$sample_ID <- as.factor(metadata$sample_ID)
@@ -61,6 +66,8 @@ metadata$lake <- as.factor(metadata$lake)
 
 # numerics
 metadata$number <- as.numeric(metadata$number)
+metadata$latitude <- as.numeric(metadata$latitude)
+metadata$longitude <- as.numeric(metadata$longitude)
 metadata$elevation_m <- as.numeric(metadata$elevation_m)
 metadata$temp_C <- as.numeric(metadata$temp_C)
 metadata$chla_ug.L <- as.numeric(metadata$chla_ug.L)
@@ -85,6 +92,8 @@ metadata$phy_group <- ifelse(metadata$organism == "Calanoid" | metadata$organism
 #make new column for elevation category
 metadata$elev.cat <- as.factor(ifelse(metadata$elevation_m < 2900, "Below", "Above"))
 
+
+
 #check that the new column called phy_group worked
 levels(as.factor(metadata$phy_group))
 levels(as.factor(metadata$elev.cat))
@@ -95,7 +104,7 @@ metadata$phy_group <- as.factor(metadata$phy_group)
 ```
 
 
-```{r making new physeq object}
+```{r making physeq object}
 
 PS.fin<-
   read_phyloseq(
@@ -107,6 +116,8 @@ PS.fin<-
   ) 
 str(PS.fin)
 
+PS.fin <- subset_taxa(PS.fin, Family!= "Mitochondria" | 
+                                is.na(Family) & Class!="Chloroplast" | is.na(Class))
 
 # change sample names to match 
 sample_names(PS.fin) <- metadata$sequence_ID
@@ -125,6 +136,7 @@ PS.fin <- readRDS("phyloseq analysis/output/PS.fin.rds")
 
 
 # Make a data frame with a column for the read counts of each sample
+sample_data(PS.fin)$read_depth <- sample_sums(PS.fin)
 sample_sum_df <- data.frame(read.sum = sample_sums(PS.fin))
 
 # make row names the sample names
@@ -140,44 +152,58 @@ write.csv(run.metaD, "phyloseq analysis/output/run.metaD.final.csv")
 ```{r exploratory richness plots}
 
 #richness by Lake
-richness.plot <- plot_richness(PS.fin, x="lake", measures=c("Observed", "Shannon")) + theme_bw()
-richness.plot
+richness.plot.location <- plot_richness(PS.rare, x="lake", measures=c("Observed", "Shannon")) + 
+  labs(y= "Alpha Diversity Measure", x = "Lake") + theme_bw() + geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 90)) + stat_compare_means(method = "anova")
+richness.plot.location
 dev.copy(pdf, "phyloseq analysis/figures/richness.plot.location.pdf", height=4, width=10)
 dev.off() 
 
 #richness by organism (or sample type i.e, water)
-richness.plot <- plot_richness(PS.fin, x="organism_water", measures=c("Observed", "Shannon")) + theme_bw()
-richness.plot
+richness.plot.organism <- plot_richness(PS.rare, x="organism_water", measures=c("Observed", "Shannon")) + 
+  labs(y= "Alpha Diversity Measure", x = "Organism") + theme_bw() + geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 90)) + stat_compare_means(method = "anova")
+richness.plot.organism
 dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=4, width=12)
 dev.off() 
 
 
-#richness by organism (or sample type i.e, water)
-richness.plot <- plot_richness(PS.fin, x="phy_group", measures=c("Observed", "Shannon")) + theme_bw() + geom_boxplot()
-richness.plot
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=4, width=12)
+#richness by phy_group (or sample type i.e, water)
+richness.plot.phy <- plot_richness(PS.rare, x="phy_group", measures=c("Observed", "Shannon")) +
+  labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90)) + stat_compare_means(method = "anova")
+richness.plot.phy
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.phy.pdf", height=4, width=12)
 dev.off() 
 
 
 #richness by Time.point
-richness.plot<-plot_richness(PS.fin, x="time_point", measures=c("Observed", "Shannon")) + theme_bw()
-richness.plot
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.Time.Point.pdf", height=4, width=10)
+richness.plot.time.point <- plot_richness(PS.rare, x="time_point", measures=c("Observed", "Shannon")) + 
+  labs(y= "Alpha Diversity Measure", x = "Time Point") + theme_bw() + geom_boxplot() +
+  stat_compare_means(method = "anova")
+
+richness.plot.time.point
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.time.point.pdf", height=4, width=10)
 dev.off() 
 
-###### 
+
 ```
 
 
 ```{r total reads by species boxplots}
 
 # Box plots showing spread of total reads by species
-pdf(file="phyloseq analysis/figures/read.by.species.pdf", height=4, width=10)
-boxplot(run.metaD$read.sum~run.metaD$organism_water)
+
+box1 <- ggplot(sample_data(PS.fin), aes(x=organism_water, y=read_depth)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90)) + labs(y= "Read Depth", x = "Organism")
+box1
+dev.copy(pdf, "phyloseq analysis/figures/reads.sample.pdf", height=4, width=7)
 dev.off() 
 
-pdf(file="phyloseq analysis/figures/reads.sample.pdf", height=4, width=7)
-ggplot(run.metaD, aes(x=organism_water, y=log(read.sum))) + geom_boxplot()
+box2 <- ggplot(sample_data(PS.fin), aes(x=organism_water, y=log(read_depth))) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90)) + labs(y= "log(Read Depth)", x = "Organism")
+box2
+dev.copy(pdf, "phyloseq analysis/figures/reads.sample.pdf", height=4, width=7)
 dev.off() 
 
 ```
@@ -223,7 +249,40 @@ dev.off()
 ```
 
 
-```{r ASV Richness and Diversity Plots}
+```{r exploring what low read count samples do and what to rarefy to}
+
+ord <- ordinate(PS.fin, method = 'PCoA', distance = 'bray')
+plot_ordination(PS.fin, ord, color = "sample_type")
+sample_data(PS.fin)$read_depth <- sample_sums(PS.fin)
+plot_ordination(PS.fin, ord, shape = "sample_type") +
+  geom_point(aes(color = read_depth > 500))
+
+
+ord <- ordinate(PS.rare, method = 'PCoA', distance = 'bray')
+plot_ordination(PS.rare, ord, shape = "sample_type") +
+  geom_point(aes(color = read_depth))
+sample_data(PS.rare)$read_depth <- sample_sums(PS.rare)
+
+```
+
+```{r rarefy}
+# rarefying to 500 reads
+
+set.seed(10000)
+PS.rare <- rarefy_even_depth(PS.fin, rngseed=1e4, sample.size = 500)
+sort(rowSums(otu_table(t(PS.rare))))
+
+# filtering metadata by sample names with 500 reads or more 
+metadata_rare <- as.data.frame(sample_data(PS.rare))
+metadata_rare$sequence_ID <- rownames(PS.rare) 
+
+
+```
+
+
+
+
+```{r INCORRECT ASV Richness and Diversity Plots}
 rich <- richness(ASV_table, index="observed")
 div <- diversity(ASV_table, index="shannon")
 div <- cbind(rich, div)
@@ -264,11 +323,14 @@ ggplot(div, aes(x=time_point, y=shannon, fill=phy_group, color=phy_group))+
 ```
 
 
-```{r prevelance of ASVs}
+```{r prevelance of ASVs by phylum}
 # Make a prevalence column so we can see how common these ASVs are 
 # Compute prevalence of each feature, store as data.frame
+
+ASV_table[1,]
 prevdf = apply(X = otu_table(PS.fin),
-               MARGIN = ifelse(taxa_are_rows(PS.fin), yes = 1, no = 2), FUN = function(x){sum(x > 0)})
+               MARGIN = ifelse(taxa_are_rows(PS.fin), yes = 1, no = 2), 
+               function(x){sum(x > 0)})
 
 # Add taxonomy and total read counts to this data.frame
 prevdf = data.frame(Prevalence = prevdf,
@@ -280,13 +342,21 @@ plyr::ddply(prevdf, "Phylum", function(df1){cbind(mean(df1$Prevalence),sum(df1$P
 
 ```{r correlations}
 
-cor(metadata$elevation_m, metadata$DOC)
+
+cor.test(metadata$elevation_m, metadata$DOC)
 ggscatter(metadata, x = "elevation_m", y = "DOC", 
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson",
           xlab = "elevation (m)", ylab = "DOC")
 
-cor(metadata$chla_ug.L, metadata$DOC)
+
+cor.test(metadata$elevation_m, metadata$temp_C)
+ggscatter(metadata, x = "elevation_m", y = "temp_C", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "elevation (m)", ylab = "Temperature (C)")
+
+cor.test(metadata$chla_ug.L, metadata$DOC)
 ggscatter(metadata, x = "chla_ug.L", y = "DOC", 
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson",
@@ -294,55 +364,262 @@ ggscatter(metadata, x = "chla_ug.L", y = "DOC",
 ```
 
 
-```{r rarefy}
-#### rarefying to 500 reads ####
-
-set.seed(10000)
-physeq.rare500 <- rarefy_even_depth(PS.fin, rngseed=1e4, sample.size = 500)
-sort(rowSums(otu_table(t(physeq.rare500))))
-
-# filtering metadata by sample names with 500 reads or more 
-metadata_500 <- as.data.frame(sample_data(physeq.rare500))
-metadata_500$sequence_ID <- rownames(metadata_500) 
+```{r T tests}
+temps <- unique(metadata$temp_C)
+t.test(x = temps)
 
 ```
 
-```{r Beta diversity distance matrix}
+
+
+
+```{r Bray curtis distance matrix}
 
 raw.asv.table <- as.data.frame(otu_table(PS.fin))
+grep('NA', metadata)
+
 str(raw.asv.table)
 str(ASV_table)
 
 set.seed(10000)
 avg_bray_500 <- avgdist(t(raw.asv.table), sample = 500, iterations = 1e3)
+str(avg_bray_500) # should be type 'dist'
+
+set.seed(10000)
+bc_vegdist <- vegdist(t(otu_table(PS.rare)), method = "bray")
+
+
+set.seed(10000)
+bc <- phyloseq::distance(PS.rare, method = "bray")
+
 ```
 
 
 
-```{r NMDS plots by time point}
-T1<- subset_samples(physeq.rare500, time_point=="1")
+```{r PERMANOVAS from distance matrix}
+
+
+set.seed(10000)
+nmds <- metaMDS(bc,
+          distance = "bray",
+          k = 3,
+          maxit = 999, 
+          trymax = 500,
+          wascores = TRUE)
+
+scores(nmds)
+species.scores <- as.data.frame(scores(nmds, display="site"))
+
+nmds2.merge <- merge(sample_data(PS.rare), species.scores, by = 'row.names', all = TRUE)
+stressplot(nmds)
+
+
+# running all sorts of PERMANOVAs
+# adonis2 has been found to be less reliable with more variable data/ distances or for uneven variation
+broad.model <- adonis2(bc ~ lake*time_point*phy_group, data = nmds2.merge, permutations = 1000)
+broad.model
+
+capture.output()
+anova(betadisper(bc, nmds2.merge$time_point))
+anova(betadisper(bc, nmds2.merge$phy_group))
+
+factors.model <- adonis2(bc ~ lake + time_point + date + phy_group + organism_water + sample_type
+                         , data = nmds2.merge, permutations = 1000)
+factors.model
+
+# model for the factors 
+model.lake <- adonis2(bc ~ lake, data = nmds2.merge) # not significant :(
+model.lake
+
+model.time <- adonis2(bc ~ nmds2.merge$time_point) # significant 
+model.time 
+
+model.date <- adonis2(bc ~ nmds2.merge$date) # significant
+model.date
+
+model.phy <- adonis2(bc ~ nmds2.merge$phy_group) # not significant
+model.phy
+
+model.group <- adonis2(bc ~ nmds2.merge$organism_water) # not significant 
+model.group
+
+model.type <- adonis2(bc ~ nmds2.merge$sample_type, permutations = 1000) # not significant :(
+model.type
+
+# models for the numerics
+
+model.DO <- adonis2(bc ~ nmds2.merge$DO_perc)  # not significant :(
+model.DO
+
+model.temp <-adonis2(bc ~ nmds2.merge$temp_C) # not significant :(
+model.temp
+
+model.DOC <- adonis2(bc ~ nmds2.merge$DOC) # significant
+model.DOC
+
+model.chla <- adonis2(bc ~ nmds2.merge$chla_ug.L) # not significant :(
+model.chla
+
+model.pH <- adonis2(bc ~ nmds2.merge$pH) # not significant :(
+model.pH
+
+model.spc <- adonis2(bc ~ nmds2.merge$spc) # not significant
+model.spc
+
+model.elev <- adonis2(bc ~ nmds2.merge$elevation_m) # not significant
+model.elev
+
+model.elevcat <- adonis2(bc ~ nmds2.merge$elev.cat) # not significant
+model.elevcat
+
+
+
+#interactions
+model.phy.by.DOC <- adonis2(bc ~ nmds2.merge$DOC*nmds2.merge$time_point) # not significant
+model.phy.by.DOC
+
+model.phy.by.DOC <- adonis2(bc ~ nmds2.merge$DOC*nmds2.merge$phy_group) # not significant
+model.phy.by.DOC
+
+model.phy.by.time <- adonis2(bc ~ nmds2.merge$phy_group*nmds2.merge$time_point) # not significant
+model.phy.by.time
+
+model.phy.by.temp <- adonis2(bc ~ nmds2.merge$phy_group*nmds2.merge$temp_C)  #significant
+model.phy.by.temp
+
+model.phy.by.elev <- adonis2(bc ~ nmds2.merge$phy_group*nmds2.merge$elevation_m) # not significant :(
+model.phy.by.elev
+
+model.chla.by.elev <- adonis2(bc ~ nmds2.merge$chla_ug.L*nmds2.merge$elevation_m) # not significant
+model.chla.by.elev
+
+model.temp.by.elev <- adonis2(bc ~ nmds2.merge$temp_C*nmds2.merge$elevation_m*nmds2.merge$temp_C) # not significant
+model.temp.by.elev
+
+model.DOC.by.elev <- adonis2(bc ~ nmds2.merge$DOC*nmds2.merge$elevation_m) # not significant :(
+model.DOC.by.elev
+
+model.DOC.by.lake <- adonis2(bc ~ nmds2.merge$DOC*nmds2.merge$lake) # not significant :(
+model.DOC.by.lake
+
+model.DOC.by.phy <- adonis2(bc ~ nmds2.merge$phy_group*nmds2.merge$DOC) # not significant
+```
+
+
+```{r ordiR2step}
+# capscale is partial distance-based redundancy analysis
+
+# bray-curtis distance matrix
+
+
+# define scope, fit global model
+dbrda <- capscale(bc_vegdist ~ time_point + lake + phy_group + DOC + temp_C, data = nmds2.merge, distance = "euclidean")
+set.seed(1999) 
+upr <- dbrda(bc ~ . + I(temp_C)^2 + I(elevation_m)^2 + I(chla_ug.L)^2 + 
+               I(DOC)^2 + I(longitude)^2 + I(latitude)^2 + I(DO_perc)^2 +
+               I(spc)^2 + I(cond)^2 + I(pH)^2, data = nmds2.merge)
+lwr <- dbrda(bc_vegdist ~ 1, data = global_df, na.action = 'na.omit')
+mod_selec <- ordiR2step(lwr, scope = formula(upr))
+anova(mod_selec)# selecting site as most important factor - good stuff honestly simple semi strong model here 
+anova(mod_selec, by = "axis")
+RsquareAdj(mod_selec)
+screeplot(mod_selec)
+
+# performing stepwise selection with ordiRstep
+ordiR2step(dbrda, )
+
+```
+
+```{r AIC}
+
+AIC()
+```
+
+
+```{r mantel test, geographic distance}
+install.packages("fossil")
+library(fossil)
+
+# to calculate geographic distances between lakes
+
+gps <- as.data.frame(cbind(sample_data(PS.fin)$latitude, sample_data(PS.fin)$longitude))
+geodists_km <- earth.dist(gps[,1:2], dist = T)
+str(geodists_km)
+mat_geodists_km <- as.matrix(geodists_km)
+str(mat_geodists_km)
+rownames(mat_geodists_km) <- rownames(sample_data(PS.fin))
+colnames(mat_geodists_km) <- t(rownames(sample_data(PS.fin)))
+
+
+# to calculate bray curtis distance
+study_bc_mat <- as.matrix(vegdist(t(raw.asv.table), "bray"))
+str(study_bc_mat)
+all_otu.dist <- phyloseq::distance(sample_data(PS.fin), "bray")
+
+# mantel distance decay
+# spatial effects on community dissimilarity were tested using distance between samples in meters and the bray curtis dissimilarity matrix
+#To run a Mantel test, we will need to generate two distance matrices: one containing spatial 
+#distances and one containing Bray-Curtis distances between samples at the given points.  In the 
+#spatial distance matrix, entries for pairs of points that are close together are lower than for 
+#pairs of points that are far apart.  In the BC matrix, entries for pairs of locations 
+#with similar outcomes are lower than for pairs of points with dissimilar outcomes.  We do this 
+#using the dist function.  The Mantel test function will require objects of this "distance" class.
+mantel_test <- mantel(study_bc_mat ~ mat_geodists_km)
+
+Study.df <- data.frame(Distance = mat_geodists_km[lower.tri(mat_geodists_km)],
+           BrayCurtis = study_bc_mat[lower.tri(study_bc_mat)])
+dim(mat_geodists_km)
+dim(study_bc_mat)
+rownames(mat_geodists_km)
+rownames(study_bc_mat)
+colnames(mat_geodists_km[lower.tri(mat_geodists_km)])
+
+Study_dist_plot <- ggplot(Study.df, aes(x=Distance, y=BrayCurtis)) +
+  geom_point(size=0.8,alpha=0.5) +
+  geom_smooth(method = "glm", formula = y~x) +
+  scale_y_continuous(name="Bray-Curtis Dissimilarity",breaks=seq(0,1,0.25),limits=c(0,1)) +
+  scale_x_continuous(name="Distance (km)",breaks=seq(0,8,2),limits=c(0,8)) +
+  theme(plot.title = element_text(size=10, hjust = 0.5),
+        axis.text.x=element_text(colour="black",size=7), 
+        axis.title.x=element_blank(),
+        axis.text.y=element_text(colour="black",size=7),
+        axis.title=element_text(colour="black",size=9),
+        legend.title=element_text(colour="black",size=7,face="bold"),
+        legend.text=element_text(colour="black",size=7),
+        panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+        panel.background=element_blank())
+
+mantel.mod<-lm(BrayCurtis~log(Distance+1), data=Study.df)
+```
+
+
+
+
+```{r MDS plots by time point}
+T1 <- subset_samples(PS.rare, time_point=="1")
 ORD.T1 <- ordinate(T1, method='MDS', distance='bray')
 
-NMDS.ord.T1<-plot_ordination(
+MDS.ord.T1 <- plot_ordination(
   physeq = T1,                                                   
   ordination = ORD.T1) +                                                
   geom_point(aes(color = lake, shape= phy_group), size = 3) +    
   stat_ellipse(level=0.9, linetype = 2, aes(color=lake)) +
   scale_color_brewer(palette = "Dark2") +
-  scale_fill_brewer(palette = "Dark2") + ggtitle("Time1") +
-  theme_classic()     
+  scale_fill_brewer(palette = "Dark2") + ggtitle("Time1") + theme_classic()
 
-NMDS.ord.T1
-dev.copy(pdf, "phyloseq analysis/figures/NMDS.ord.T1.pdf", height=6, width=7)
+MDS.ord.T1
+dev.copy(pdf, "phyloseq analysis/figures/MDS.ord.T1.pdf", height=6, width=7)
 dev.off() 
 
 
-######################################################
 
-T2<- subset_samples(physeq.rare500, time_point=="2")
+
+
+T2<- subset_samples(PS.rare, time_point=="2")
 ORD.T2 <- ordinate(T2, method='MDS', distance='bray')
 
-NMDS.ord.T2<-plot_ordination(
+MDS.ord.T2<-plot_ordination(
   physeq = T2,                                                   
   ordination = ORD.T2) +                                                
   geom_point(aes(color = lake, shape= phy_group), size = 3) +    
@@ -351,17 +628,19 @@ NMDS.ord.T2<-plot_ordination(
   scale_fill_brewer(palette = "Dark2") + ggtitle("Time2") +
   theme_classic()     
 
-NMDS.ord.T2
-dev.copy(pdf, "phyloseq analysis/figures/NMDS.ord.T2.pdf", height=6, width=7)
+MDS.ord.T2
+dev.copy(pdf, "phyloseq analysis/figures/MDS.ord.T2.pdf", height=6, width=7)
 dev.off() 
 
 
-#############################################
 
-T3<- subset_samples(physeq.rare500, time_point=="3")
+
+
+
+T3<- subset_samples(PS.rare, time_point=="3")
 ORD.T3 <- ordinate(T3, method='MDS', distance='bray')
 
-NMDS.ord.T3<-plot_ordination(
+MDS.ord.T3<-plot_ordination(
   physeq = T3,                                                   
   ordination = ORD.T3) +                                                
   geom_point(aes(color = lake, shape= phy_group), size = 3) +    
@@ -370,18 +649,18 @@ NMDS.ord.T3<-plot_ordination(
   scale_fill_brewer(palette = "Dark2") + ggtitle("Time3") +
   theme_classic()     
 
-NMDS.ord.T3
-dev.copy(pdf, "phyloseq analysis/figures/NMDS.ord.T3.pdf", height=6, width=7)
+MDS.ord.T3
+dev.copy(pdf, "phyloseq analysis/figures/MDS.ord.T3.pdf", height=6, width=7)
 dev.off() 
 
 
 
-###############################################
 
-T4<- subset_samples(physeq.rare500, time_point=="4")
+
+T4<- subset_samples(PS.rare, time_point=="4")
 ORD.T4 <- ordinate(T4, method='MDS', distance='bray')
 
-NMDS.ord.T4<-plot_ordination(
+MDS.ord.T4<-plot_ordination(
   physeq = T4,                                                   
   ordination = ORD.T4) +                                                
   geom_point(aes(color = lake, shape= phy_group), size = 3) +    
@@ -390,18 +669,18 @@ NMDS.ord.T4<-plot_ordination(
   scale_fill_brewer(palette = "Dark2") + ggtitle("Time4") +
   theme_classic()     
 
-NMDS.ord.T4
-dev.copy(pdf, "phyloseq analysis/figures/NMDS.ord.T4.pdf", height=6, width=7)
+MDS.ord.T4
+dev.copy(pdf, "phyloseq analysis/figures/MDS.ord.T4.pdf", height=6, width=7)
 dev.off() 
 
 
 
-################################################
 
-T5<- subset_samples(physeq.rare500, time_point=="5")
+
+T5<- subset_samples(PS.rare, time_point=="5")
 ORD.T5 <- ordinate(T5, method='MDS', distance='bray')
 
-NMDS.ord.T5<-plot_ordination(
+MDS.ord.T5<-plot_ordination(
   physeq = T5,                                                   
   ordination = ORD.T5) +                                                
   geom_point(aes(color = lake, shape= phy_group), size = 3) +    
@@ -410,161 +689,68 @@ NMDS.ord.T5<-plot_ordination(
   scale_fill_brewer(palette = "Dark2") + ggtitle("Time5") +
   theme_classic()     
 
-NMDS.ord.T5
-dev.copy(pdf, "phyloseq analysis/figures/NMDS.ord.T5.pdf", height=6, width=7)
+MDS.ord.T5
+dev.copy(pdf, "phyloseq analysis/figures/MDS.ord.T5.pdf", height=6, width=7)
 dev.off() 
 ```
 
 
 
-```{r}
-#### PERMANOVAS from distance matrix ####
-
-
-set.seed(10000)
-nmds_2 <- metaMDS(avg_bray_500,
-          distance = "bray",
-          k = 3,
-          maxit = 999, 
-          trymax = 500,
-          wascores = TRUE)
-
-species.scores2 <- as.data.frame(scores(nmds_2, display="site"))
-nmds2.merge <- merge(metadata_500, species.scores2, by = 'row.names', all = TRUE)
-
-nmds2.merge$elev.cat <- as.factor(ifelse(nmds2.merge$elevation_m < 2900, "Below", "Above"))
-nmds2.merge$basin <- as.factor(ifelse(nmds2.merge$lake == 'Eastern Brook' | nmds2.merge$lake == 'Serene' | nmds2.merge$lake == 'Convict', 'South', 
-                                      ifelse(nmds2.merge$lake == 'Cooney'| nmds2.merge$lake == 'Blue' | nmds2.merge$lake == 'Virginia', 'North', NA)))
-
-# running all sorts of PERMANOVAs
-
-broad.model <- adonis2(avg_bray_500 ~ lake*time_point*phy_group, data = nmds2.merge, permutations = 1000)
-broad.model
-
-# model for the factors 
-model.lake <- adonis2(avg_bray_500 ~ lake, data = nmds2.merge) # not significant :(
-model.lake
-
-model.time <- adonis2(avg_bray_500 ~ nmds2.merge$time_point) # significant 
-model.time 
-
-model.date <- adonis2(avg_bray_500 ~ nmds2.merge$date) # significant
-model.date
-
-model.phy <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group) # significant
-model.phy
-
-model.group <- adonis2(avg_bray_500 ~ nmds2.merge$organism_water) # not significant :(
-model.group
-
-model.type <- adonis2(avg_bray_500 ~ nmds2.merge$sample_type) # not significant :(
-model.type
-
-# models for the numerics
-
-model.DO <- adonis2(avg_bray_500 ~ nmds2.merge$DO_perc)  # not significant :(
-model.DO
-
-model.temp <-adonis2(avg_bray_500 ~ nmds2.merge$temp_C) # not significant :(
-model.temp
-
-model.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC) # significant
-model.DOC
-
-model.chla <- adonis2(avg_bray_500 ~ nmds2.merge$chla_ug.L) # not significant :(
-model.chla
-
-model.pH <- adonis2(avg_bray_500 ~ nmds2.merge$pH) # not significant :(
-model.pH
-
-model.spc <- adonis2(avg_bray_500 ~ nmds2.merge$spc) # not significant :(
-model.spc
-
-model.elev <- adonis2(avg_bray_500 ~ nmds2.merge$elevation_m) # significant
-model.elev
-
-model.elevcat <- adonis2(avg_bray_500 ~ nmds2.merge$elev.cat) # significant
-model.elevcat
-
-
-#interactions
-model.phy.by.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$time_point) # significant
-model.phy.by.DOC
-
-model.phy.by.DOC <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$phy_group) # significant
-model.phy.by.DOC
-
-model.phy.by.time <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group*nmds2.merge$time_point) # significant
-model.phy.by.time
-
-model.phy.by.temp <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group*nmds2.merge$temp_C)  #significant
-model.phy.by.temp
-
-model.phy.by.elev <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group*nmds2.merge$elevation_m) # not significant :(
-model.phy.by.elev
-
-model.chla.by.elev <- adonis2(avg_bray_500 ~ nmds2.merge$chla_ug.L*nmds2.merge$elevation_m) # significant
-model.chla.by.elev
-
-model.DOC.by.elev <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$elevation_m) # not significant :(
-model.DOC.by.elev
-
-model.DOC.by.lake <- adonis2(avg_bray_500 ~ nmds2.merge$DOC*nmds2.merge$lake) # not significant :(
-model.DOC.by.lake
-
-model.DOC.by.phy <- adonis2(avg_bray_500 ~ nmds2.merge$phy_group*nmds2.merge$DOC)
-
-
-
-```
-
 ```{r NMDS time_point}
 centroid <- nmds2.merge %>% 
-  group_by(sample_type) %>%
+  group_by(time_point) %>%
   summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
+
   
-test_nmds <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color=time_point), size = 3) + 
-  stat_ellipse(level=0.9, linetype = 2, aes(color=time_point)) +
+test_nmds <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2), color = time_point) +
+  geom_point(aes(color = time_point), size = 3) + 
+  geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = time_point), show.legend = F) +
+  stat_ellipse(level=0.9, linetype = 2, aes(color=time_point), show.legend = F) +
   theme_bw()
 test_nmds
 
 
 ```
-```{r NMDS phy_group}
+
+
+```{r NMDS phy_group by time point}
 centroid <- nmds2.merge %>% 
-  group_by(phy_group) %>%
-  group_by(elev.cat) %>%
+  group_by(time_point) %>%
   summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
 str(nmds2.merge)
 
   
 test_nmds1 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "1"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
   geom_point(aes(color = phy_group), size = 3) + 
+  geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = time_point), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
   theme_bw()
 test_nmds1
 
 test_nmds2 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "2"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
   geom_point(aes(color = phy_group), size = 3) + 
+   geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = time_point), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
   theme_bw()
 test_nmds2
 
 test_nmds3 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "3"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
   geom_point(aes(color = phy_group), size = 3) + 
+   geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = time_point), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
   theme_bw()
 test_nmds3
 
 test_nmds4 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "4"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
   geom_point(aes(color = phy_group), size = 3) + 
+   geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = time_point), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
   theme_bw()
 test_nmds4
 
 test_nmds5 <- ggplot(nmds2.merge[(nmds2.merge$time_point == "5"), ], aes(x=NMDS1, y=NMDS2, color = phy_group)) +
   geom_point(aes(color = phy_group), size = 3) + 
+   geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = time_point), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
   theme_bw()
 test_nmds5
@@ -578,11 +764,14 @@ centroid <- nmds2.merge %>%
   
 test_nmds <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2, color = lake)) +
   geom_point(aes(color = lake), size = 3) + 
+   geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = lake), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=lake)) +
   theme_bw()
 test_nmds
 ```
-```{r}
+
+
+```{r NMDS elevation}
 centroid <- nmds2.merge %>% 
   group_by(elev.cat) %>%
   summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
@@ -590,10 +779,14 @@ str(nmds2.merge)
 
 test_nmds1 <- ggplot(nmds2.merge, aes(x=NMDS1, y=NMDS2, color = elev.cat)) +
   geom_point(aes(shape = phy_group), size = 3) + 
+  geom_point(data = centroid, size = 5, shape = 21, color = "black", aes(fill = elev.cat), show.legend = F) +
   stat_ellipse(level=0.9, linetype = 2, aes(color=elev.cat)) +
   theme_bw()
 test_nmds1
 ```
+
+
+
 
 
 ```{r dbRDA}
@@ -614,18 +807,20 @@ plot(my_dbRDA)
 
 
 ```
+
+
 ```{r PCoA}
 all_pcoa <- ordinate(
-  physeq = PS.fin, 
+  physeq = PS.rare, 
   method = "PCoA", 
   distance = "bray"
 )
 
-PCoA.ord.plot<-plot_ordination(
-  physeq = PS.fin,                                                       
-  ordination = all_pcoa)+                                                
-  geom_point(aes(color=time_point), size = 3) +  
-  stat_ellipse(type = "norm", linetype = 2, aes(color=phy_group)) +
+PCoA.ord.plot <- plot_ordination(
+  physeq = PS.rare,                                                       
+  ordination = all_pcoa, color = "time_point") +                                                
+  geom_point(aes(color = phy_group), size = 3) +  
+  stat_ellipse(type = "norm", linetype = 2, aes(color=time_point)) +
   scale_shape_manual(values = c(21, 22, 23, 24, 25)) +
   theme_classic() +                                                      
   theme(                             
@@ -643,7 +838,7 @@ dev.copy(pdf, "phyloseq analysis/figures/PCoA.pdf", height=7, width=10)
 dev.off() 
 
 ```
-```{r stacked bar phylum}
+```{r stacked bar phylum - incorrect}
 
 # make colors for sites
 library(RColorBrewer)
@@ -706,87 +901,138 @@ Bac.Phyla.stacked.bar1
 ggsave(filename = "figures/Bac.Phyla.stacked.bar1.pdf", plot = Bac.Phyla.stacked.bar1, height=5.5, width=10)
 ```
 
-```{r stacked bar family}
 
-ESV_rel_abund <- transform_sample_counts(PS.fin,function(x) x/sum(x))
-ESV_dataframe<-psmelt(ESV_rel_abund)
-ESV_dataframe$Abundance<- ifelse(ESV_dataframe$Abundance < 1e-2, 0, ESV_dataframe$Abundance)
 
-Abund<-aggregate(Abundance~time_point+lake+organism_water+phy_group+elevation_m+temp_C+Family+Genus+Species, data=ESV_dataframe, FUN=mean)
+
+```{r stacked bar Phylum - correct?}
+
+ASV_rel_abund <- transform_sample_counts(PS.rare,function(x) x/sum(x))
+ASV_dataframe <- psmelt(ASV_rel_abund)
+ASV_dataframe$Abundance<- ifelse(ASV_dataframe$Abundance < 1e-2, 0, ASV_dataframe$Abundance)
+Abund <- aggregate(Abundance ~ time_point + lake + organism_water + phy_group + 
+                     elevation_m + temp_C + Phylum + Class + Order + Family +
+                     Genus+Species, data=ESV_dataframe, FUN=mean)
+
+# testing to see if all the relative abundances of each ASV within sample 1 add up to 1
+length(which(ASV_dataframe$Sample == "98_16S"))
+sample98 <- ASV_dataframe$Sample == "98_16S"
+test <- as.matrix(ASV_dataframe[sample98, "Abundance"])
+sum(test)
+
+Abund.fa <- Abund[(Abund$Family=="Burkholderiales"),]
+p1 <- ggplot(Abund.fa, aes(x=time_point, y=Abundance, fill= Family)) +
+  geom_bar(aes(fill = Family), stat ="identity", position ="fill")+
+  facet_grid(cols=vars(phy_group), rows=vars(lake))
+
+
+p1 <- ggplot(Abund, aes(x = time_point, y = Abundance, fill= Class)) +
+  geom_bar(aes(fill = Class), stat ="identity", position ="fill") +
+  facet_grid(cols=vars(phy_group), rows=vars(lake))
+
+
 
 # by lake and time_point
-stacked1 <- ggplot(data=Abund, aes(x = lake, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family), stat ="identity", position ="fill") +
-  facet_grid(~time_point, scales="free")
+stacked1 <- ggplot(data=Abund, aes(x = lake, y = Abundance), fill = Class) +
+  geom_bar(aes(fill = Class), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
 
 stacked1
-dev.copy(pdf, "phyloseq analysis/figures/stacked.pdf", height=7, width=10)
+dev.copy(pdf, "phyloseq analysis/figures/stacked1.pdf", height=7, width=10)
 dev.off() 
 
 ###
 
-
-stacked2 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = lake, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
-  theme(legend.position="bottom") + guides(fill=guide_legend(nrow=7)) +
-  facet_grid(~time_point, scales="free")
+# time point 1
+stacked2 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = lake, y = Abundance), fill = Phylum) +
+  geom_bar(aes(color = Phylum, fill = Phylum, ), stat ="identity", position ="fill") +
+  theme(legend.position="bottom") + guides(fill=guide_legend(nrow=7)) + 
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
+stacked2
+dev.copy(pdf, "phyloseq analysis/figures/stacked2.pdf", height=7, width=10)
+dev.off() 
 
 # by time_point for Blue
-stacked3 <- ggplot(data=Abund[Abund$lake=="Blue",], aes(x = lake, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+stacked3 <- ggplot(data=Abund[Abund$lake =="Blue",], aes(x = lake, y = Abundance), fill = Phylum) +
+  geom_bar(aes(color = Phylum, fill = Phylum, ), stat ="identity", position ="fill") +
   facet_grid(~time_point, scales="free")
 stacked3
 dev.copy(pdf, "phyloseq analysis/figures/stacked3.pdf", height=7, width=10)
 dev.off() 
 
-# by organism_water
-stacked4 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = organism_water, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
+# by time_point for Eastern Brook
+stacked <- ggplot(data=Abund[Abund$lake =="Eastern Brook",], aes(x = lake, y = Abundance), fill = Phylum) +
+  geom_bar(aes(color = Phylum, fill = Phylum, ), stat ="identity", position ="fill") +
   facet_grid(~time_point, scales="free")
+stacked
+dev.copy(pdf, "phyloseq analysis/figures/stacked.pdf", height=7, width=10)
+dev.off() 
+
+# time_point by phy_group
+stacked4 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = phy_group, y = Abundance), fill = Class) +
+  geom_bar(aes(color = Class, fill = Class, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
 
 stacked4
 dev.copy(pdf, "phyloseq analysis/figures/stacked4.pdf", height=7, width=10)
 dev.off() 
 
-stacked5 <- ggplot(data=Abund[Abund$time_point=="2",], aes(x = organism_water, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
-  facet_grid(~time_point, scales="free")
+stacked5 <- ggplot(data=Abund[Abund$time_point=="2",], aes(x = phy_group, y = Abundance), fill = Class) +
+  geom_bar(aes(color = Class, fill = Class, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
 
 stacked5
 dev.copy(pdf, "phyloseq analysis/figures/stacked5.pdf", height=7, width=10)
 dev.off() 
 
-stacked6 <- ggplot(data=Abund[Abund$time_point=="3",], aes(x = organism_water, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
-  facet_grid(~time_point, scales="free")
+stacked6 <- ggplot(data=Abund[Abund$time_point=="3",], aes(x = phy_group, y = Abundance), fill = Class) +
+  geom_bar(aes(color = Class, fill = Class, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
 
 stacked6
 dev.copy(pdf, "phyloseq analysis/figures/stacked6.pdf", height=7, width=10)
 dev.off() 
 
-stacked7 <- ggplot(data=Abund[Abund$time_point=="4",], aes(x = organism_water, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
-  facet_grid(~time_point, scales="free")
+stacked7 <- ggplot(data=Abund[Abund$time_point=="4",], aes(x = phy_group, y = Abundance), fill = Class) +
+  geom_bar(aes(color = Class, fill = Class, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
 
 stacked7
 dev.copy(pdf, "phyloseq analysis/figures/stacked7.pdf", height=7, width=10)
 dev.off() 
 
 
-stacked8 <- ggplot(data=Abund[Abund$time_point=="5",], aes(x = organism_water, y = Abundance), fill = Family) +
-  geom_bar(aes(color = Family, fill = Family, ), stat ="identity", position ="fill") +
-  facet_grid(~time_point, scales="free")
+stacked8 <- ggplot(data=Abund[Abund$time_point=="5",], aes(x = phy_group, y = Abundance), fill = Class) +
+  geom_bar(aes(color = Class, fill = Class, ), stat ="identity", position ="fill") +
+  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
 
 stacked8
 dev.copy(pdf, "phyloseq analysis/figures/stacked8.pdf", height=7, width=10)
-dev.off() 
+dev.off()
 
+
+plot_composition(PS.fin)
 
 ```
 
-
 ```{r}
-# Using physeq.rare to make community comp figure 
+ASV_abund <- transform_sample_counts(PS.fin,function(x) x)
+ASV_reads_DF <- psmelt(ASV_abund)
+
+Reads<-aggregate(Abundance~time_point+lake+organism_water+phy_group+elevation_m+
+                   temp_C+Phylum+Class+Order+Family+Genus+Species, data=ESV_reads_DF, FUN=sum)
+#Reads<-aggregate(Abundance~time_point+lake+organism_water+phy_group+elevation_m+temp_C+Phylum, data=ESV_reads_DF, FUN=sum)
+
+Reads$samp_tot<-summaryBy(Abundance~time_point + lake + organsim_water + phy_group, 
+                          data=Reads, FUN="sum")
+
+library(doBy)
+x<-summaryBy(Abundance~lake+time_point, data=Abund, FUN="mean")
+```
+
+
+
+```{r Using physeq.rare to make community comp figure }
+
 
 
 # aggregating ASVs by class 
@@ -810,12 +1056,10 @@ phylum_proportions$Phyla <- row.names(phylum_proportions) # column of phyla
 # check they all add up to 1
 sum(phylum_proportions[,1])
 
-###########
-  
 
 
-  
-##############
+
+
 # making data long - sample column, phyla column, relative abundance column 
 phylum_prop_long <- phylum_proportions %>% 
   pivot_longer(cols = colnames(phylum_proportions[,1:320]), 
@@ -827,8 +1071,8 @@ str(phylum_prop_long)
 # now we have long df with each sample and the rel abundance of phyla 
 ```
 
-merging with metadata - specifically site level and elev.cat level 
-```{r}
+
+```{r merging with metadata - specifically site level and elev.cat level }
 # manipulating metadata file: 
 
 comp.metadata <- as.data.frame(metadata[, c(1,4,5,7,9,10,20)])
@@ -837,8 +1081,8 @@ comp.metadata <- as.data.frame(metadata[, c(1,4,5,7,9,10,20)])
 phyla_comp <-  inner_join(phylum_prop_long, comp.metadata, by = "sequence_ID")
 ```
 
-# plotting Phylum composition 
-```{r}
+
+```{r plotting Phylum composition }
 # basic figure of mean relative abundance for above and below treeline
 phyla_comp %>% 
   group_by(time_point, Phyla) %>% 
