@@ -1,0 +1,158 @@
+---
+title: "zoop counts"
+output: html_document
+date: "2023-07-08"
+---
+
+```{r loading necessary packages}
+library(dplyr)
+library(vegan)
+```
+
+
+
+```{r testing effects and plotting}
+
+# load in the density data
+# density is the number of zoops per liter
+counts <- read.csv('zoop counts/data/Zoop counts.csv')
+counts$time <- as.factor(counts$time)
+counts$lake <- as.factor(counts$lake)
+
+# make sample number (each sample is a different row)
+counts$sample <- row.names(counts)
+
+
+# make a new column at the end for total added density of all zoops at each time/lake combo?
+counts_mod <- counts[,c(20:31)]%>%
+  mutate(sum_of_rows = rowSums(.))
+counts_mod
+
+counts$dens.row.sums <- counts_mod[,13]
+
+
+# make a new column for region category
+counts$region <- as.factor(ifelse(counts$lake == "Eastern Brook" | counts$lake == "Serene", "South", ifelse(counts$lake == "Cooney" | counts$lake == "Blue" | counts$lake == "Virginia", "North", "Middle")))
+
+
+# overall effects on totals densities
+ggplot(counts, aes(x = time, y = dens.row.sums, color = lake, group = lake)) +
+   geom_point() + geom_line()
+tot.dens.anova <- anova(lm(dens.row.sums ~ time + lake, data = counts))
+tot.dens.anova <- aov(lm(dens.row.sums ~ time + lake, data = counts))
+TukeyHSD(tot.dens.anova)
+
+# daphnia
+ggplot(counts, aes(x = time, y = daphnia.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(daphnia.dens ~ time + lake, data = counts))
+
+# calanoid
+ggplot(counts, aes(x = time, y = cal.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(cal.dens ~ time + lake, data = counts))
+
+ggplot(counts, aes(x = time, y = cal.dens, color = region, group = region)) +
+  geom_point() + geom_line()
+anova(lm(cal.dens ~ time + region, data = counts))
+
+# cyclopoid
+ggplot(counts, aes(x = time, y = cyc.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(cyc.dens ~ time + lake, data = counts))
+
+# nauplii
+ggplot(counts, aes(x = time, y = nau.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(nau.dens ~ time + lake, data = counts))
+
+# ceriodaphnia
+ggplot(counts, aes(x = time, y = cerio.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(cerio.dens ~ time + lake, data = counts))
+
+# bosmina
+ggplot(counts, aes(x = time, y = bos.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(bos.dens ~ time + lake, data = counts))
+
+# kellicotia
+ggplot(counts, aes(x = time, y = kell.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(kell.dens ~ time + lake, data = counts))
+
+# keratella
+ggplot(counts, aes(x = time, y = ker.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(ker.dens ~ time + lake, data = counts))
+
+# holopedium
+ggplot(counts, aes(x = time, y = holo.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(holo.dens ~ time + lake, data = counts))
+
+# polyphemus
+ggplot(counts, aes(x = time, y = poly.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(poly.dens ~ time + lake, data = counts))
+
+# asplancha
+ggplot(counts, aes(x = time, y = asp.dens, color = lake, group = lake)) +
+  geom_point() + geom_line()
+anova(lm(asp.dens ~ time + lake, data = counts))
+
+```
+
+
+
+```{r alpha diversity}
+
+# Shannon diversity
+d <- vegan::diversity(counts[,c(20:31)], index="shannon", groups = counts$lake)
+
+# richness
+sample.r <- specnumber(counts[,c(20:31)])
+lake.r <- specnumber(counts[,c(20:31)], groups = counts$lake)
+time.r <- specnumber(counts[,c(20:31)], groups = counts$time)
+
+
+```
+
+
+
+```{r beta diversity and nmds}
+
+# bray curtis and nmds
+set.seed(10)
+bc_counts <- vegdist(counts[,c(20:31)], method = 'bray')
+nmds_counts <- metaMDS(bc_counts,
+        distance = "bray",
+          k = 3,
+          maxit = 999, 
+          wascores = TRUE)
+species.scores.counts <- as.data.frame(scores(nmds_counts))
+nmds.merge.counts <- merge(counts[,c(1,2,32:40)], species.scores.counts, by = 'row.names', all = TRUE)
+
+
+nmds.counts <- ggplot(nmds.merge.counts, aes(x=NMDS1, y=NMDS2, color = time)) +
+  geom_point(aes(color = time), size = 2.3) + 
+  stat_ellipse(level=0.9, lwd = 1, linetype = 2, aes(color=time)) +
+  scale_color_manual(values = c("orangered", "turquoise2", "navy", "violetred", "lightslateblue")) + 
+  theme_bw() +
+  theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        legend.key.height = unit(1, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=20), #change legend title font size
+        legend.text = element_text(size=18)) #change legend text font size
+nmds.counts
+```
+
+
+```{r effects of env. on densities}
+
+summary(lm(daphnia.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts))
+summary(lm(nau.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts))
+
+```
+
+
