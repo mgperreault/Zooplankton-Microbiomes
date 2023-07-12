@@ -4,9 +4,6 @@ output: html_document
 date: "2022-12-11"
 ---
 
-
-
-
 ```{r}
 #TDN ------------
 
@@ -59,7 +56,8 @@ str(lakeDOC.df)
 
 log.DOC.plot<-ggplot(lakeDOC.df, aes(x=Time.Point, y=DOC_values, group=Lake, color=Lake)) +
   scale_y_log10() + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + 
-  xlab("Sampling Time Point") + ylab(expression(paste("log(DOC)", ~(mg~L^-1), sep = "")))
+  xlab("Sampling Time Point") + ylab(expression(paste("log(DOC)", ~(mg~L^-1), sep = ""))) +
+  theme(text = element_text(size = 10))
 
 
 log.DOC.plot
@@ -82,7 +80,7 @@ str(chla.df)
 
 chla.df$Chlorophyll.1..ug.L<-as.numeric(chla.df$Chlorophyll.1..ug.L)
 
-chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chlorophyll-a", ~(mu*g~ L^-1), sep = "")))
+chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chl-a", ~(mu*g~ L^-1), sep = "")))
 
 chla.plot
 dev.print(pdf, "figures/chla.plot.pdf")
@@ -103,7 +101,9 @@ lakeDO.df$Time.Point<-as.factor(lakeDO.df$Time.Point)
 
 str(lakeDO.df)
 
-DO.percent.plot<-ggplot(lakeDO.df, aes(x=Time.Point, y=DO..perc, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("DO (%)")
+DO.percent.plot<-ggplot(lakeDO.df, aes(x=Time.Point, y=DO..perc, group=Lake, color=Lake)) + geom_line() + 
+  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("DO (%)") +
+  theme(text = element_text(size = 10))
 
 DO.percent.plot
 dev.print(pdf, "figures/DO.percent.plot.pdf")
@@ -123,7 +123,10 @@ lakeCond.df$Time.Point<-as.factor(lakeCond.df$Time.Point)
 
 str(lakeCond.df)
 
-conductivity.plot<-ggplot(lakeCond.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("Conductivity(S)")
+conductivity.plot<-ggplot(lakeCond.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) +
+  geom_line() + theme(axis.text.x = element_text(size = 5)) +
+  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") +
+  ylab(expression(paste("Conductivity", ~(mu*S~ cm^-1), sep = "")))
 
 conductivity.plot
 dev.print(pdf, "figures/conductivity.plot.pdf")
@@ -160,7 +163,9 @@ lakepH.df$Time.Point<-as.factor(lakepH.df$Time.Point)
 
 str(lakepH.df)
 
-pH.plot<-ggplot(lakepH.df, aes(x=Time.Point, y=pH, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point")
+pH.plot<-ggplot(lakepH.df, aes(x=Time.Point, y=pH, group=Lake, color=Lake)) + geom_line() +
+  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") +
+  theme(text = element_text(size = 10))
 
 pH.plot
 dev.print(pdf, "figures/pH.plot.pdf")
@@ -203,13 +208,16 @@ laketemp.df$Lake<-as.factor(laketemp.df$Lake)
 
 str(laketemp.df)
 
-laketemp.plot<-ggplot(laketemp.df, aes(x=Time.Point, y=temp..C, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("Temperature (°C)")
+laketemp.plot<-ggplot(laketemp.df, aes(x=Time.Point, y=temp..C, group=Lake, color=Lake)) + geom_line() +
+  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("Temperature(°C)") +
+  theme(text = element_text(size = 10))   
 
 
 laketemp.plot
 dev.print(pdf, "figures/laketemp.plot.pdf")
 dev.off
 ```
+
 
 
 ```{r}
@@ -220,12 +228,23 @@ install.packages("patchwork")
 library("patchwork")
 library("ggpubr")
 
-chla.plot + DO.percent.plot + conductivity.plot + pH.plot + laketemp.plot + TotalAlkalinity.plot + TN.plot + TP.plot + DOC.plot + plot_layout(guides="collect") 
 
-ggarrange(DOC.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), chla.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), DO.percent.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), conductivity.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), pH.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), laketemp.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), TP.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), TN.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), plot_layout(guides="collect"), labels=NULL, common.legend = TRUE, legend="bottom", align="hv", font.label = list(size=10, color="black", family=NULL, position="top", labels="auto"))
-
-dev.print(pdf, "figures/combined.plot.pdf")
+combined.plot <- ggarrange(chla.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
+                           DO.percent.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
+                           conductivity.plot + rremove("xlab") +  theme(axis.title.y=element_text(size=8)),
+                           laketemp.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
+                           pH.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)), 
+                           log.DOC.plot + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
+                           labels = c("A", "B", "C", "D", "E", "F"), nrow = 2, ncol = 3,
+                           common.legend = TRUE, legend="bottom",
+                           align="hv", font.label = list(size=10, color="black", family=NULL, position = "top"))
+combined.plot
+final.combined.plot <- annotate_figure(combined.plot, bottom = text_grob("Sampling Time Point", vjust = -6))
+final.combined.plot
+dev.print(pdf, "figures/final.combined.plot.pdf")
 dev.off
+
+
 ```
 
 ```{r}
@@ -234,17 +253,18 @@ dev.off
 install.packages("patchwork")
 library("patchwork")
 library("ggpubr")
+library(cowplot)
 
 
-log.DOC.plot + DO.percent.plot + pH.plot + laketemp.plot + plot_layout(guides="collect")
+combined.plot <- ggarrange(chla.plot + rremove("xlab"), DO.percent.plot + rremove("xlab"), 
+                           conductivity.plot + rremove("xlab"),
+                           common.legend = TRUE, legend="bottom", nrow = 2, ncol = 2, vjust = 2, 
+                           font.label = list(size = 12, face = "bold", color ="black"), 
+                           labels = c("A", "B", "C"))
 
-
-ggarrange(log.DOC.plot, DO.percent.plot, pH.plot, laketemp.plot, label.x = "Sampling Time Point", common.legend = TRUE, legend="bottom", nrow = 2, ncol = 2)
-
+combined.plot
 dev.print(pdf, "Figures/combined.plot.pdf")
 dev.off
 ```
-
-
 
 
