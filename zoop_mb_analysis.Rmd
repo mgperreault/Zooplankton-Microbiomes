@@ -182,6 +182,10 @@ sample_sum_df$sequence_ID <- rownames(sample_sum_df)
 # merge in the reads
 run.metaD <- merge(metadata, sample_sum_df, by="sequence_ID", all.y=TRUE)
 write.csv(run.metaD, "phyloseq analysis/output/run.metaD.final.csv")
+
+mean(run.metaD$read.sum)
+min(run.metaD$read.sum)
+max(run.metaD$read.sum)
 ```
 
 
@@ -190,12 +194,9 @@ write.csv(run.metaD, "phyloseq analysis/output/run.metaD.final.csv")
 # finding average abundance of each class of bacteria for samples overall
 glom <- tax_glom(PS.hell, taxrank = 'Class')
 C.abund <- transform_sample_counts(glom, function(x)100* x / sum(x))
-OTU <- otu_table(C.abund)
-TAX <- tax_table(C.abund)[,"Class"]
-AverageD <- as.data.frame(rowMeans(OTU))
-names(AverageD) <- c("Mean")
-GTable <- merge(TAX, AverageD, by=0, all=TRUE)
-sort(GTable[,2], decreasing = T)
+C.abund <- psmelt(C.abund)
+avg.abund <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
+
 
 taxa_table <- tax_table(PS.hell)
 taxa_class <- taxa_table[, "Class"]
@@ -203,48 +204,11 @@ unique_classes <- as.data.frame(unique(taxa_class))
 unique_classes <- as.data.frame(get_taxa_unique(PS.hell, "Family"))
 
 
-Cglom = tax_glom(PS.hell, "Family", NArm = F) %>% transform_sample_counts(function(x) {x * 100/sum(x)})
-
-# The taxa orders are the same in tax_table() and otu_table()
-# Use 'rowMeans(otu_table(GPf))' to calculate per-row average in the OTU table
-df = data.frame(Family = tax_table(Cglom)[,"Family"], Mean = rowMeans(otu_table(Cglom)), row.names = NULL)
-df = df[order(-df$Mean),]
-head(df)
-
-
-
 # another way, based on frequency not averages
 all_class <- table(tax_table(PS.hell)[,"Class"])
 sorted_class <- sort(all_class, decreasing = T)
 top_class <- names(sorted_class)[1:5]
 
-#
-names(sort(taxa_sums(PS.hell), TRUE)[1:5])
-
-
-# 
-library(dplyr)
-tb <- psmelt(physeq) %>%
-  filter(!is.na(Phylum)) %>%
-  group_by(Sex, Sample, Phylum) %>%
-  # Add abundances within each phylum and sample
-  summarize_at("Abundance", sum) %>%
-  # Get phylum proportions within each sample
-  summarize_at("Proportion", ~ . / sum(.)) %>%
-  # Get the mean proportion each phylum across samples within the `Sex` (Male/Female) variable
-  summarize_at("Proportion", mean)
-
-#
-library(dplyr)
-tb <- psmelt(PS.hell) %>%
-  filter(!is.na(Class)) %>%
-  group_by(phy_group, Class) %>%
-  # Add abundances within each phylum and sample
-  summarize_at("Abundance", sum) %>%
-  # Get phylum proportions within each sample
-  summarize_at("Proportion", ~ . / sum(.)) %>%
-  # Get the mean proportion each phylum across samples within the `Sex` (Male/Female) variable
-  summarize_at("Proportion", mean)
 ```
 
 
@@ -371,6 +335,16 @@ set.seed(10000)
 hell.model <- adonis2(bc.hell ~ lake*time_point*phy_group, data = nmds.merge.hell, permutations = 1000)
 hell.model
 
+install.packages('devtools')
+library(devtools)
+install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis") 
+library(pairwiseAdonis)
+
+# post hoc pairwise comparison to see what's driving the significance:
+pairwise.adonis2(bc.hell ~ time_point, data = nmds.merge.hell)
+pairwise.adonis2(bc.hell ~ phy_group, data = nmds.merge.hell)
+pairwise.adonis2(bc.hell ~ lake, data = nmds.merge.hell)
+
 
 coef <- coefficients(hell.model)
 top.coef <- sort(head(coef[rev(order(abs(coef)))],20))
@@ -382,7 +356,8 @@ ggplot(data.frame(x = top.coef,
     labs(x="",y="",title="Top Taxa") +
     theme_bw()
 
-permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
+
+disp <- permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
 # time is significant in the betadisper, sample_type and phy_group are not
 
 anosim(bc.hell, nmds.merge.hell$time_point, permutations = 1000)
@@ -440,6 +415,7 @@ dev.off()
 rich.rare <- richness(otu_table(PS.hell), index ="observed")
 div.rare <- diversity(otu_table(PS.hell), index="shannon")
 
+
 # combine into one data frame
 rare.a.diversity <- cbind(rich.rare, div.rare)
 rare.a.diversity$sequencing_ID <- rownames(div.rare)
@@ -454,13 +430,18 @@ shapiro.test(rare.a.diversity$shannon)
 
 # lake and sample type are significant
 anova(lm(shannon ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
+shan.anova <- aov(lm(shannon ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
+TukeyHSD(shan.anova) # shows that Serene is highly different from all the other lakes and is driving the significant difference
+
 anova(lm(observed ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
+rich.anova <- aov(lm(observed ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
+TukeyHSD(rich.anova) # again, Serene is driving the significant difference
 
 summary(lm(shannon ~  temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond, data = rare.a.diversity))
 summary(lm(observed ~  temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond, data = rare.a.diversity))
 
 # R squared
-summary(lm(observed ~ chla_ug.L, data = rare.a.diversity))
+summary(lm(observed ~ chla_ug.L + pH, data = rare.a.diversity))
 
 a.div.mod <- lm(shannon ~ temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond, data = rare.a.diversity)
 a.div.AIC <- MASS::stepAIC(a.div.mod, direction = "both")
@@ -468,7 +449,7 @@ a.div.AIC <- MASS::stepAIC(a.div.mod, direction = "both")
 
 rich.mod <- lm(observed ~ temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond + basin, data = rare.a.diversity)
 rich.AIC <- MASS::stepAIC(rich.mod, direction = "both")
-rich.mod <- lm(observed ~ chla_ug.L, data = rare.a.diversity)
+rich.mod <- lm(observed ~ chla_ug.L + DO_perc, data = rare.a.diversity)
 
 
 
@@ -691,6 +672,19 @@ FitAll <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + 
 # Dissolved oxygen and chla are important
 step(FitAll, direction = "both")
 # cond and chla
+
+
+actinobacteria <- subset(Abund.hell, Class == "Actinobacteria")
+actinobacteria <- summaryBy(Abundance ~ sequence_ID, data = actinobacteria, FUN = sum)
+actinobacteria <- data.frame(actinobacteria, row.names = actinobacteria[,1])
+actinobacteria <- merge(actinobacteria, metadata_500, by = "row.names")
+Anova(lm(Abundance.sum ~ lake + time_point + phy_group, data = actinobacteria))
+# lake is important
+FitAll <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = actinobacteria)
+# Dissolved oxygen and chla are important
+step(FitAll, direction = "both")
+# cond and chla
+
 
 # Merge the abundance matrix, metadata, and taxa table based on sample IDs
 merged_data <- merge(t(class_abundance), metaD, by = "row.names", na.rm= TRUE)
@@ -1682,7 +1676,6 @@ ASV_dataframe_hell <- psmelt(ASV_rel_abund_hell)
 Abund.hell <- aggregate(Abundance ~ sequence_ID + time_point + lake + organism_water + phy_group + sample_type +
                      Phylum + Class + Order + Family +
                      Genus+Species, data=ASV_dataframe_hell, FUN=mean)
-avg.abund <- summaryBy(Abundance ~ Class, data = Abund.hell, FUN = mean)
 
 
 ASV_rel_abund_zoops <- transform_sample_counts(PS.zoops, function(x) x/sum(x))
@@ -1710,9 +1703,20 @@ sum(test)
 
 # plots
 
+phyla.hell <- ggplot(Abund.hell, aes(x = time_point, y = Abundance, fill= Phylum, color = Phylum)) +
+  geom_bar(aes(fill = Phylum, color = Phylum), stat ="identity", position = "fill") +
+  facet_grid(cols = vars(lake), rows = vars(phy_group)) + xlab("Sampling Time Point") +  ylab("Relative Abundance (%)") +
+  theme_bw() + theme(axis.text.x=element_text(size=12)) +
+  theme(axis.text.y=element_text(size=10)) +
+  theme(strip.text.y = element_text(size = 15)) +
+  scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "purple3", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
+  scale_color_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "purple3", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink"))
+phyla.hell
+
+
 Facet.hell <- ggplot(Abund.hell, aes(x = time_point, y = Abundance, fill= Class, color = Class)) +
-  geom_bar(aes(fill = Class, color = Class), stat ="identity", position = "fill") +
-  facet_grid(cols = vars(lake)) + xlab("Sampling Time Point") +
+  geom_bar(width = 0.8, aes(fill = Class, color = Class), stat ="identity", position = "fill") +
+  facet_grid(cols = vars(lake), rows = vars(phy_group)) + xlab("Sampling Time Point") +  ylab("Relative Abundance (%)") +
   theme_bw() + theme(axis.text.x=element_text(size=12)) +
   theme(axis.text.y=element_text(size=10)) +
   theme(strip.text.y = element_text(size = 15)) +
@@ -1724,7 +1728,7 @@ dev.off()
 
 time.hell <- ggplot(Abund.hell, aes(x=time_point, y=Abundance, fill=Class, color=Class)) +
   geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
-  xlab("Sampling Time Point") + theme(axis.text.x=element_text(size=12)) +
+  xlab("Sampling Time Point") + ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
   theme(axis.text.y=element_text(size=10)) +
   theme(strip.text.y = element_text(size = 15)) + theme_bw() +
   scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "purple3", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
@@ -1735,7 +1739,7 @@ dev.off()
 
 sample.type.hell <- ggplot(Abund.hell, aes(x=phy_group, y=Abundance, fill=Class, color=Class)) +
   geom_bar(aes(fill=Class, color=Class), width = 0.75, stat="identity", position="fill") +
-  xlab("Sample Type") + theme(axis.text.x=element_text(size=12)) +
+  xlab("Sample Type") +  ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
   theme(axis.text.y=element_text(size=10)) +
   theme(strip.text.y = element_text(size = 15)) + theme_bw() +
   scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "purple3", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
@@ -1746,7 +1750,7 @@ dev.off()
 
 sample.type.order <- ggplot(Abund.hell, aes(x=phy_group, y=Abundance, fill=Order, color=Order)) +
   geom_bar(aes(fill=Order, color=Order), width = 0.75, stat="identity", position="fill") +
-  xlab("Sample Type") + theme(axis.text.x=element_text(size=12)) +
+  xlab("Sample Type") +  ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
   theme(axis.text.y=element_text(size=10)) +
   theme(strip.text.y = element_text(size = 15)) + theme_bw() +
   scale_fill_manual(values = c('turquoise','pink2', 'tan', 'orange', 'cornflowerblue', 
