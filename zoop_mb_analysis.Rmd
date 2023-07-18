@@ -186,6 +186,8 @@ write.csv(run.metaD, "phyloseq analysis/output/run.metaD.final.csv")
 mean(run.metaD$read.sum)
 min(run.metaD$read.sum)
 max(run.metaD$read.sum)
+summaryBy(read.sum ~ sample_type, data = run.metaD, FUN = c(mean,sd))
+
 ```
 
 
@@ -193,11 +195,29 @@ max(run.metaD$read.sum)
 
 # finding average abundance of each class of bacteria for samples overall
 glom <- tax_glom(PS.hell, taxrank = 'Class')
-C.abund <- transform_sample_counts(glom, function(x)100* x / sum(x))
+C.abund <- transform_sample_counts(glom, function(x) x / sum(x))
 C.abund <- psmelt(C.abund)
-avg.abund <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
+avg.abund <- summaryBy(Abundance ~ Class*, data = C.abund, FUN = mean)
 
 
+pseq <- microbiome::transform(PS.hell, "compositional")
+ps1.fam.rel <-aggregate_rare(pseq, level = "Class", detection = 0.005, prevalence = 0.1)
+
+p <- plot_composition(ps1.fam.rel,
+                      average_by = "sample_type") + 
+  guides(fill = guide_legend(ncol = 1)) + 
+  labs(x = "Samples", 
+       y = "Relative abundance",
+       title = "Relative abundance data", 
+       subtitle = "Subtitle",
+       caption = "Caption text.")
+class.comp.plot <- print(p + scale_fill_brewer("Class", palette = "Paired") + theme_bw())
+
+
+
+
+
+# finding the unique taxa names
 taxa_table <- tax_table(PS.hell)
 taxa_class <- taxa_table[, "Class"]
 unique_classes <- as.data.frame(unique(taxa_class))
@@ -221,6 +241,7 @@ reads <- ggplot(sample_data(PS.fin), aes(x=organism_water, y=read_depth)) + geom
 reads
 dev.copy(pdf, "phyloseq analysis/figures/reads.sample.pdf", height=4, width=7)
 dev.off() 
+
 
 log.reads <- ggplot(sample_data(PS.fin), aes(x=organism_water, y=log(read_depth))) + geom_boxplot() +
   theme(axis.text.x = element_text(angle = 90)) + labs(y= "log(Read Depth)", x = "Organism")
@@ -332,7 +353,7 @@ nmds.merge.hell$basin <- as.factor(ifelse(nmds.merge.hell$lake == "Eastern Brook
 
 # estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
 set.seed(10000)
-hell.model <- adonis2(bc.hell ~ lake*time_point*phy_group, data = nmds.merge.hell, permutations = 1000)
+hell.model <- adonis2(bc.hell ~ lake*time_point + phy_group, data = nmds.merge.hell, permutations = 1000)
 hell.model
 
 install.packages('devtools')
@@ -356,7 +377,8 @@ ggplot(data.frame(x = top.coef,
     labs(x="",y="",title="Top Taxa") +
     theme_bw()
 
-
+permutest(betadisper(bc.hell, nmds.merge.hell$lake), pairwise = T)
+permutest(betadisper(bc.hell, nmds.merge.hell$phy_group), pairwise = T)
 disp <- permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
 # time is significant in the betadisper, sample_type and phy_group are not
 
@@ -370,9 +392,8 @@ anosim(bc.hell, nmds.merge.hell$time_point, permutations = 1000)
 #richness by Lake for zoops only
 richness.plot.location <- plot_richness(PS.fin, x="lake", measures=c("Observed", "Shannon")) + 
   labs(y= "Alpha Diversity Measure", x = "Lake") + theme_bw() + geom_boxplot() + 
-  theme(axis.text.x = element_text(angle = 90)) + stat_compare_means(method = "anova") +
-  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12)) +
-  ggtitle("Zooplankton Samples- Microbial Community Alpha Diversity")
+  theme(axis.text.x = element_text(angle = 90)) +
+  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
 richness.plot.location
 dev.copy(pdf, "phyloseq analysis/figures/richness.plot.location.pdf", height=5, width=7)
 dev.off()
@@ -380,27 +401,27 @@ dev.off()
 
 #richness by organism (or sample type i.e, water)
 richness.plot.organism <- plot_richness(PS.fin, x="sample_type", measures=c("Observed", "Shannon")) + 
-  labs(y= "Alpha Diversity Measure", x = "Organism") + theme_bw() + geom_boxplot() + 
-  theme(axis.text.x = element_text(angle = 90)) + stat_compare_means(method = "anova")
+  labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
+  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
 richness.plot.organism
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=4, width=12)
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=5, width=7)
 dev.off() 
 
 
 #richness by phy_group (or sample type i.e, water)
 richness.plot.phy <- plot_richness(PS.fin, x="phy_group", measures=c("Observed", "Shannon")) +
   labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
-  theme(axis.text.x = element_text(angle = 90)) + stat_compare_means(method = "anova")
+  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
 richness.plot.phy
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.phy.pdf", height=4, width=12)
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.phy.pdf", height=5, width=7)
 dev.off() 
 
 #richness by Time.point
 richness.plot.time.point <- plot_richness(PS.fin, x="time_point", measures=c("Observed", "Shannon")) + 
   labs(y= "Alpha Diversity Measure", x = "Time Point") + theme_bw() + geom_boxplot() +
-  stat_compare_means(method = "anova")
+  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
 richness.plot.time.point
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.time.point.pdf", height=4, width=10)
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.time.point.pdf", height=5, width=7)
 dev.off() 
 
 ```
@@ -429,11 +450,11 @@ shapiro.test(rare.a.diversity$shannon)
 
 
 # lake and sample type are significant
-anova(lm(shannon ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
+anova(lm(shannon ~ lake + time_point + sample_type, data = rare.a.diversity))
 shan.anova <- aov(lm(shannon ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
 TukeyHSD(shan.anova) # shows that Serene is highly different from all the other lakes and is driving the significant difference
 
-anova(lm(observed ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
+anova(lm(observed ~ lake + time_point + sample_type, data = rare.a.diversity))
 rich.anova <- aov(lm(observed ~ lake + time_point + sample_type + phy_group + basin, data = rare.a.diversity))
 TukeyHSD(rich.anova) # again, Serene is driving the significant difference
 
@@ -457,6 +478,9 @@ rich.mod <- lm(observed ~ chla_ug.L + DO_perc, data = rare.a.diversity)
 # summaryBy for averages and lm for regression model to conduct anova for significance
 rare.sum_div <- summaryBy(shannon ~ sample_type, data = rare.a.diversity, FUN = c(mean, se))
 rare.sum_rich <- summaryBy(observed ~ sample_type, data = rare.a.diversity, FUN = c(mean, se))
+
+time_div <- summaryBy(shannon ~ time_point, data = rare.a.diversity, FUN = c(mean, se))
+time_rich <- summaryBy(observed ~ time_point, data = rare.a.diversity, FUN = c(mean, se))
 
 # plots
 
@@ -922,9 +946,15 @@ anova(lm(NMDS1 ~ PC1*lake, data = NMDSxPCA_data))
 # subset continuous environmental data
 env.hell <- sample_data(PS.hell)[ ,c(10:16,18,19)]
 
+# subset by lake so that we can look at the env. effects through TIME in EACH LAKE
+env.hell.serene <- sample_data(PS.hell)[sample_data(PS.hell)$lake == "Serene" ,c(10:16,18,19)]
+
+# have to actually go back, trace my steps to run an nmds on just serene, and just convict, etc. to get a matching nmds object
+nmds.hell.serene
+
 # run the envfit function
 fit.env.hell <- envfit(nmds.hell, env.hell, na.rm = T)
-
+fit.env.hell.serene <- envfit(nmds.hell, env.hell.serene, na.rm = T)
 
 # colors and groups for plots
 lake_colors <- c("royalblue1", "chartreuse3", "chocolate1", "deeppink2", "khaki4", "orchid")
@@ -1145,9 +1175,6 @@ spatial_dist_km <- as.dist(spatial_dist_km) # make distance matrix
 #just to check dims
 bc_dist <- as.matrix(bc.hell)
 dim(bc.hell)
-
-mantel_test <- mantel.rtest(spatial_dist, bc.hell, nrepet=999)
-mantel_test
 
 vegan::mantel((spatial_dist_km), bc.hell)
 # observation value in the output is the observed correlation (r) and shows sign (pos or neg corr.)
@@ -1483,7 +1510,18 @@ nmds.phy_group
 dev.print(pdf, "phyloseq analysis/figures/nmds.phy_group.pdf", height=10, width=15)
 dev.off
 
-
+nmds.phy_group <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = chla_ug.L)) +
+  geom_point(size = 3) + 
+  stat_ellipse(aes(color = chla_ug.L), level=0.9, lwd = 1, linetype = 2) +
+  theme_bw() +
+  theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        legend.key.height = unit(1, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=20), #change legend title font size
+        legend.text = element_text(size=18)) #change legend text font size
+nmds.phy_group
+dev.print(pdf, "phyloseq analysis/figures/nmds.phy_group.pdf", height=10, width=15)
+dev.off
 
 ```
 
@@ -1521,16 +1559,18 @@ coord_df$longitude_squared <- poly_terms[, 5]
 
 # CAPSCALE
 set.seed(10000)
-capscale_result <- capscale(bc.hell ~ chla_ug.L + cond + DO_perc + pH + temp_C + DOC + elevation_m, dfun = "distance", data = nmds.merge.hell, distance = "bray")
+capscale_result <- capscale(bc.hell ~ cond + chla_ug.L + DO_perc + pH + temp_C + DOC + elevation_m, dfun = "distance", data = nmds.merge.hell, distance = "bray")
 capscale_model <- capscale(bc.hell ~ 1, data = nmds.merge.hell, distance = "bray")
 # fitting global model, then performing stepwise selection with ordiRstep
 mod <- ordiR2step(capscale_model, scope = capscale_result)
-anova(mod) # no matter the order of the explanatory variables in the original formula, the output of this shows that temp. is most important
+Anova(mod) # no matter the order of the explanatory variables in the original formula, the output of this shows that temp. is most important
 summary(mod)
+plot(mod)
 
 # most parsimonious dbRDA model
+set.seed(10000)
 capscale_model <- capscale(bc.hell ~ temp_C, data = nmds.merge.hell, dfun = "distance", distance = "bray")
-anova(capscale_model)
+capscale_model_an <- Anova(capscale_model)
 plot(capscale_model)
 # BUT chla and DOC also seem important
 alt_model <- capscale(bc.hell ~ temp_C + DOC + chla_ug.L, data = nmds.merge.hell, distance = "bray")
@@ -1538,18 +1578,30 @@ anova(alt_model)
 plot(alt_model)
 
 
+mod_scores <- as.data.frame(scores(mod, choices = c(1,2), display = "sites"))
+merge.dbrda <- merge(mod_scores, nmds.merge.hell, by = "row.names")
+
+
+
 cap_scores <- as.data.frame(scores(capscale_model, display = "sites"))
 nmds.merge.hell$CAP1 <- cap_scores$CAP1
 nmds.merge.hell$MDS1 <- cap_scores$MDS1
-CAPxMDS_data <- data.frame(CAP1 = cap_scores$CAP1, MDS1 = cap_scores$MDS1, time = sample_data(PS.hell)$time_point, lake = sample_data(PS.hell)$lake)
+CAPxMDS_data <- data.frame(CAP1 = cap_scores$CAP1, MDS1 = cap_scores$MDS1, time = sample_data(PS.hell)$time_point, lake = sample_data(PS.hell)$lake, temp = sample_data(PS.hell)$temp_C)
 CAPxMDS <- ggplot(CAPxMDS_data, aes(x = CAP1, y = MDS1, color = lake)) +
   geom_point() + stat_ellipse() +
   #geom_smooth(aes(color=lake, fill=lake), method = "lm", alpha = .2) +
   xlab("CAP1 (Environment)") + ylab("MDS1 (Bray-Curtis)") +
   theme_bw()
-CAPxMDS 
-dev.copy(pdf, "phyloseq analysis/figures/CAPxMDS.pdf", height=4, width=10)
-dev.off() 
+CAPxMDS
+
+ordiplot(CAPxMDS_data[,c(1:2)], type="n", main=substitute(paste("")), cex.main=1, display="sites", xlim=c(-0.25, 0.8), cex.lab=0.8, cex.axis=0.8)
+abline(h = 0, lty = "dotted")
+abline(v = 0, lty = "dotted")
+points(capscale_model, "sites", cex=0.8, pch=16, col = "gray62")
+ordihull(environm_plot, groups=nmds.merge.hell$lake, draw="polygon", alpha=80, col = unique(lake_colors))
+legend("topright", legend=levels(lake.group), cex=1, pch=16, col=unique(lake_colors), pt.cex=1, bty="n")
+par.new=T
+
 
 
 
@@ -1661,37 +1713,66 @@ dev.off()
 
 
 ```{r stacked bar plots}
-### rarefied
-ASV_rel_abund500 <- transform_sample_counts(PS.500, function(x) x/sum(x))
-ASV_dataframe500 <- psmelt(ASV_rel_abund500)
-Abund500 <- aggregate(Abundance ~ sequence_ID + time_point + lake + organism_water + phy_group + sample_type +
-                     Phylum + Class + Order + Family +
-                     Genus+Species, data=ASV_dataframe500, FUN=mean)
-sum.abund <- summaryBy(Abundance ~ sequence_ID*Class, data = Abund500, FUN = sum)
+
+# trying something
+ASV_rel_abund_hell <- transform_sample_counts(PS.fin, function(x) x/sum(x))
+pm <- psmelt(ASV_rel_abund_hell)
+abund_plot <- pm %>%
+  dplyr::group_by(sample_type) %>%
+  mutate(tot = sum(Abundance)) %>%
+  group_by(Class, sample_type) %>%
+  summarise(rel_abund = sum(Abundance)/tot)
+
+########### plotting relative abundance
+
+ASV_rel_abund <- transform_sample_counts(PS.fin, function(x) x/sum(x))
+pm <- psmelt(ASV_rel_abund)
+Abund <- aggregate(Abundance ~ phy_group + lake + time_point + Class, data=pm, FUN=sum)
+sam <- aggregate(Abundance ~ phy_group + lake + time_point , data=pm, FUN=sum) # this should include everything Abund has except for Class
+
+colnames(sam)[ncol(sam)] <- "tot.abund" # renaming the last column 'tot.abund' so that we can differentiate that from rel.abund
+
+Abund.final <- dplyr::full_join(Abund, sam)
+Abund.final$rel_abund <- Abund.final$Abundance/Abund.final$tot.abund
+View(Abund.final)
+
+Abund.final$Class[Abund.final$rel_abund <= 0.05] <- "Other (<5%)" # classes that have rel.abund less than 5% will be named as other
 
 
-### Hellinger transformed
-ASV_rel_abund_hell <- transform_sample_counts(PS.hell, function(x) x/sum(x))
-ASV_dataframe_hell <- psmelt(ASV_rel_abund_hell)
-Abund.hell <- aggregate(Abundance ~ sequence_ID + time_point + lake + organism_water + phy_group + sample_type +
-                     Phylum + Class + Order + Family +
-                     Genus+Species, data=ASV_dataframe_hell, FUN=mean)
+# plot
+overall.comp <- ggplot(Abund.final, aes(x=phy_group, y=rel_abund, fill=Class, color=Class)) +
+  geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
+  ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
+  theme(axis.text.y=element_text(size=10)) +
+  theme(strip.text.y = element_text(size = 15)) + theme_bw() +
+  scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
+  scale_color_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink"))
+overall.comp
+dev.copy(pdf, "phyloseq analysis/figures/overall.comp.pdf", height=6, width=10)
+dev.off()
 
 
-ASV_rel_abund_zoops <- transform_sample_counts(PS.zoops, function(x) x/sum(x))
-ASV_dataframe_zoops <- psmelt(ASV_rel_abund_zoops)
-#ASV_dataframe1000$Abundance <- ifelse(ASV_dataframe_zoops$Abundance < 1e-2, 0, ASV_dataframe_zoops$Abundance)
-Abund_zoops <- aggregate(Abundance ~ sequence_ID + time_point + lake + organism_water + phy_group + 
-                     Phylum + Class + Order + Family +
-                     Genus+Species, data=ASV_dataframe_zoops, FUN=mean)
+
+Facet <- ggplot(Abund.final, aes(x = time_point, y = rel_abund, fill= Class, color = Class)) +
+  geom_bar(width = 0.8, aes(fill = Class, color = Class), stat ="identity", position = "fill") +
+  facet_grid(cols = vars(lake), rows = vars(phy_group)) + xlab("Sampling Time Point") +  ylab("Relative Abundance (%)") +
+  theme_bw() + theme(axis.text.x=element_text(size=12)) +
+  theme(axis.text.y=element_text(size=10)) +
+  theme(strip.text.y = element_text(size = 15)) +
+  scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
+  scale_color_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink"))
+Facet
+dev.copy(pdf, "phyloseq analysis/figures/Facet.pdf", height=6, width=10)
+dev.off()
+
+# calculate
+sum.abund <- summaryBy(rel_abund ~ Class*phy_group, data = Abund.final, FUN = mean)
+
+###############
 
 
-ASV_rel_abund_water <- transform_sample_counts(PS.water, function(x) x/sum(x))
-ASV_dataframe_water <- psmelt(ASV_rel_abund_water)
-#ASV_dataframe1000$Abundance <- ifelse(ASV_dataframe_zoops$Abundance < 1e-2, 0, ASV_dataframe_zoops$Abundance)
-Abund_water <- aggregate(Abundance ~ time_point + lake + organism_water + 
-                     Phylum + Class + Order + Family +
-                     Genus+Species, data=ASV_dataframe_water, FUN=mean)
+
+
 
 
 # testing to see if all the relative abundances of each ASV within sample 1 add up to 1
@@ -1701,7 +1782,8 @@ test <- as.matrix(ASV_dataframe500[sample322, "Abundance"])
 sum(test)
 
 
-# plots
+
+
 
 phyla.hell <- ggplot(Abund.hell, aes(x = time_point, y = Abundance, fill= Phylum, color = Phylum)) +
   geom_bar(aes(fill = Phylum, color = Phylum), stat ="identity", position = "fill") +
@@ -1714,17 +1796,6 @@ phyla.hell <- ggplot(Abund.hell, aes(x = time_point, y = Abundance, fill= Phylum
 phyla.hell
 
 
-Facet.hell <- ggplot(Abund.hell, aes(x = time_point, y = Abundance, fill= Class, color = Class)) +
-  geom_bar(width = 0.8, aes(fill = Class, color = Class), stat ="identity", position = "fill") +
-  facet_grid(cols = vars(lake), rows = vars(phy_group)) + xlab("Sampling Time Point") +  ylab("Relative Abundance (%)") +
-  theme_bw() + theme(axis.text.x=element_text(size=12)) +
-  theme(axis.text.y=element_text(size=10)) +
-  theme(strip.text.y = element_text(size = 15)) +
-  scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "purple3", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
-  scale_color_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "purple3", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink"))
-Facet.hell
-dev.copy(pdf, "phyloseq analysis/figures/Facet.hell.pdf", height=6, width=10)
-dev.off()
 
 time.hell <- ggplot(Abund.hell, aes(x=time_point, y=Abundance, fill=Class, color=Class)) +
   geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
