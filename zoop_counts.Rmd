@@ -177,7 +177,9 @@ dev.off
 ```{r alpha diversity}
 
 # Shannon diversity
-zoop.comm.div <- vegan::diversity(counts[,c(20:31)], index="shannon")
+zoop.comm.div <- as.data.frame(vegan::diversity(counts[,c(20:31)], index="shannon"))
+zoop.comm.div <- cbind(zoop.comm.div, counts)
+names(zoop.comm.div)[1] <- "Shannon"
 zoop.comm.div.lakes <- vegan::diversity(counts[,c(20:31)], index="shannon", groups = counts$lake)
 zoop.comm.div.time <- vegan::diversity(counts[,c(20:31)], index="shannon", groups = counts$time)
 
@@ -191,6 +193,7 @@ time.r <- specnumber(counts[,c(20:31)], groups = counts$time)
 
 
 ```
+
 
 ```{r species frequency}
 
@@ -269,13 +272,13 @@ nmds.counts
 
 ```{r effects of env. on densities}
 
-summary(lm(daphnia.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts))
-summary(lm(cal.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts))
-summary(lm(cyc.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts))
-summary(lm(nau.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts))
-summary(lm(bos.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts))
-summary(lm(ker.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts))
-summary(lm(kell.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts))
+summary(lm(daphnia.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts)) #temp
+summary(lm(cal.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts)) #none
+summary(lm(cyc.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts)) #temp
+summary(lm(nau.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #temp
+summary(lm(bos.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #none
+summary(lm(ker.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #none
+summary(lm(kell.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #none
 ```
 
 

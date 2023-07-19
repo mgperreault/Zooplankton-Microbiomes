@@ -193,9 +193,9 @@ C.abund$Class <- as.character(C.abund$Class)
 avg.abund <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
 
 # finding the unique taxa names
-taxa_table <- tax_table(PS.hell)
-taxa_class <- taxa_table[, "Class"]
-unique_classes <- as.data.frame(unique(taxa_class))
+taxa_table <- tax_table(PS.fin)
+taxa_order <- taxa_table[, "Order"]
+unique_order <- as.data.frame(unique(taxa_class))
 unique_classes <- as.data.frame(get_taxa_unique(PS.hell, "Family"))
 
 
@@ -335,7 +335,7 @@ hell.model <- adonis2(bc.hell ~ lake*time_point + phy_group, data = nmds.merge.h
 hell.model
 
 set.seed(10000)
-hell.model.env <- adonis2(bc.hell ~ temp_C + DOC, data = nmds.merge.hell, permutations = 1000)
+hell.model.env <- adonis2(bc.hell ~ temp_C , data = nmds.merge.hell, permutations = 1000)
 hell.model.env
 
 
@@ -531,7 +531,7 @@ Bacteroidia <- summaryBy(Abundance ~ sequence_ID, data = Bacteroidia, FUN = sum)
 Bacteroidia <- data.frame(Bacteroidia, row.names = Bacteroidia[,1])
 Bacteroidia <- merge(Bacteroidia, sample_data(PS.fin), by = "row.names")
 view(Bacteroidia)
-summary(lm(Abundance.sum ~ lake + time_point + phy_group, data = Bacteroidia))
+Anova(lm(Abundance.sum ~ lake + time_point + phy_group, data = Bacteroidia))
 FitAll.bacter <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = Bacteroidia)
 step(FitAll.bacter, direction = "both")
 # nothing significant
@@ -540,40 +540,41 @@ gammaproteobacteria <- subset(my_class, Class == "Gammaproteobacteria")
 gammaproteobacteria <- summaryBy(Abundance ~ sequence_ID, data = gammaproteobacteria, FUN = sum)
 gammaproteobacteria <- data.frame(gammaproteobacteria, row.names = gammaproteobacteria[,1])
 gammaproteobacteria <- merge(gammaproteobacteria, sample_data(PS.fin), by = "row.names")
-summary(lm(Abundance.sum ~ lake + time_point + phy_group, data = gammaproteobacteria))
+Anova(lm(Abundance.sum ~ lake + time_point + phy_group, data = gammaproteobacteria))
 FitAll.gamma <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = gammaproteobacteria)
 step(FitAll.gamma, direction = "both") # chlorophyll
-
+summary(lm(Abundance.sum ~ chla_ug.L, data = gammaproteobacteria))
 
 alphaproteobacteria <- subset(my_class, Class == "Alphaproteobacteria")
 alphaproteobacteria <- summaryBy(Abundance ~ sequence_ID, data = alphaproteobacteria, FUN = sum)
 alphaproteobacteria <- data.frame(alphaproteobacteria, row.names = alphaproteobacteria[,1])
 alphaproteobacteria <- merge(alphaproteobacteria, sample_data(PS.fin), by = "row.names")
-summary(lm(Abundance.sum ~ lake + time_point + phy_group, data = alphaproteobacteria))
-# lake is important
+Anova(lm(Abundance.sum ~ lake + time_point + phy_group, data = alphaproteobacteria))
 FitAll.alpha <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = alphaproteobacteria)
-# Dissolved oxygen and chla are important
 step(FitAll.alpha, direction = "both") # elevation
-
+summary(lm(Abundance.sum ~ elevation_m, data = alphaproteobacteria)) #nah
 
 actinobacteria <- subset(my_class, Class == "Actinobacteria")
 actinobacteria <- summaryBy(Abundance ~ sequence_ID, data = actinobacteria, FUN = sum)
 actinobacteria <- data.frame(actinobacteria, row.names = actinobacteria[,1])
 actinobacteria <- merge(actinobacteria, sample_data(PS.fin), by = "row.names")
-summary(lm(Abundance.sum ~ lake + time_point + phy_group, data = actinobacteria))
+Anova(lm(Abundance.sum ~ lake + time_point + phy_group, data = actinobacteria))
+act.aov <- aov(lm(Abundance.sum ~ lake + time_point + phy_group, data = actinobacteria))
+TukeyHSD(act.aov)
 # lake is important
 FitAll.actino <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = actinobacteria)
 step(FitAll.actino, direction = "both") # DO
+summary(lm(Abundance.sum ~ DO_perc, data = actinobacteria))
 
 
 cyanobacteriia <- subset(my_class, Class == "Cyanobacteriia")
 cyanobacteriia <- summaryBy(Abundance ~ sequence_ID, data = cyanobacteriia, FUN = sum)
 cyanobacteriia <- data.frame(cyanobacteriia, row.names = cyanobacteriia[,1])
 cyanobacteriia <- merge(cyanobacteriia, sample_data(PS.fin), by = "row.names")
-summary(lm(Abundance.sum ~ lake + time_point + phy_group, data = cyanobacteriia))
-# lake is important
+Anova(lm(Abundance.sum ~ lake + time_point + phy_group, data = cyanobacteriia))
 FitAll.cyano <- lm(Abundance.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = cyanobacteriia)
 step(FitAll.cyano, direction = "both") # chlorophyll
+summary(lm(Abundance.sum ~ chla_ug.L, data = cyanobacteriia)) # nah
 
 
 ```
@@ -1598,20 +1599,39 @@ my_class <- PS.fin %>%
   filter(Abundance > 0.05) %>%                         # Filter out low abundance taxa
   arrange(Class)  
 view(my_class)
+
+my_order <- PS.fin %>%
+  tax_glom(taxrank = "Order") %>%                     # agglomerate at phylum level
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% # Transform to rel. abundance
+  psmelt() %>%                                         # Melt to long format
+  filter(Abundance > 0.05) %>%                         # Filter out low abundance taxa
+  arrange(Order)  
+view(my_order)
+
 # plot
-overall.comp <- ggplot(Abund.final, aes(x=phy_group, y=rel_abund, fill=Class, color=Class)) +
-  geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
+overall.comp <- ggplot(my_order, aes(x=phy_group, y=Abundance, fill=Order, color=Order)) +
+  geom_bar(aes(fill=Order, color=Order), stat="identity", position="fill") +
   ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
   theme(axis.text.y=element_text(size=10)) +
   theme(strip.text.y = element_text(size = 15)) + theme_bw() +
-  scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink")) +
-  scale_color_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "skyblue4", "navy", "tan3", "royalblue3", "black", "antiquewhite2", "chartreuse3", "chocolate", "orchid", "lightpink"))
+  scale_fill_manual(values = c('turquoise','pink2', 'tan', 'orange', 'cornflowerblue', 
+                'magenta', 'darkolivegreen4', 'indianred1', 'tan4', 'darkblue', 
+                'mediumorchid1','firebrick4',  'yellowgreen', 'lightsalmon', 'tan3',
+                "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse', 
+                'seagreen1', 'moccasin', 'mediumvioletred', 'seagreen','cadetblue1',
+                "darkolivegreen1" ,"tan2" ,   "tomato3" , "#7CE3D8","gainsboro", "gold2", "chocolate", "darkgreen", "dodgerblue", "burlywood3", 'hotpink', 'yellow3', 'blue', 'pink', 'brown3')) +
+  scale_color_manual(values = c('turquoise','pink2', 'tan', 'orange', 'cornflowerblue', 
+                'magenta', 'darkolivegreen4', 'indianred1', 'tan4', 'darkblue', 
+                'mediumorchid1','firebrick4',  'yellowgreen', 'lightsalmon', 'tan3',
+                "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse', 
+                'seagreen1', 'moccasin', 'mediumvioletred', 'seagreen','cadetblue1',
+                "darkolivegreen1" ,"tan2" ,   "tomato3" , "#7CE3D8","gainsboro", "gold2", "chocolate", "darkgreen", "dodgerblue", "burlywood3", 'hotpink', 'yellow3', 'blue', 'pink', 'brown3'))
 overall.comp
 dev.copy(pdf, "phyloseq analysis/figures/overall.comp.pdf", height=6, width=10)
 dev.off()
 
 
-Facet <- ggplot(Abund.final, aes(x = time_point, y = rel_abund, fill= Class, color = Class)) +
+Facet <- ggplot(my_class, aes(x = time_point, y = Abundance, fill= Class, color = Class)) +
   geom_bar(width = 0.8, aes(fill = Class, color = Class), stat ="identity", position = "fill") +
   facet_grid(cols = vars(lake), rows = vars(phy_group)) + xlab("Sampling Time Point") +  ylab("Relative Abundance (%)") +
   theme_bw() + theme(axis.text.x=element_text(size=12)) +
