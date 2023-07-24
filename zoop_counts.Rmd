@@ -24,7 +24,7 @@ counts$sample <- row.names(counts)
 
 
 # make a new column at the end for total added density of all zoops at each time/lake combo?
-counts_mod <- counts[,c(8:19)]%>%
+counts_mod <- counts[,c(23:34)]%>%
   mutate(sum_of_rows = rowSums(.))
 counts_mod
 
@@ -47,7 +47,7 @@ TukeyHSD(tot.dens.anova)
 
 # daphnia
 daphnia <- ggplot(counts, aes(x = time, y = daphnia.dens, color = lake, group = lake)) +
-  geom_point() + geom_line(linewidth = 1.1)
+  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Daphnia Density")
 daphnia
 dev.print(pdf, "zoop counts/figures/daphnia.pdf", height=10, width=15)
 dev.off
@@ -55,7 +55,7 @@ Anova(lm(daphnia.dens ~ time + lake, data = counts))
 
 # calanoid
 calanoid <- ggplot(counts, aes(x = time, y = cal.dens, color = lake, group = lake)) +
-  geom_point() + geom_line(linewidth = 1.1)
+  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Calanoid Density")
 calanoid
 dev.print(pdf, "zoop counts/figures/calanoid.pdf", height=10, width=15)
 dev.off
@@ -67,19 +67,21 @@ Anova(lm(cal.dens ~ time + region, data = counts)) # region
 
 # cyclopoid
 cyclopoid <- ggplot(counts, aes(x = time, y = cyc.dens, color = lake, group = lake)) +
-  geom_point() + geom_line(linewidth = 1.1)
+  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Cyclopoid Density")
 cyclopoid
 dev.print(pdf, "zoop counts/figures/cyclopoid.pdf", height=10, width=15)
 dev.off
 Anova(lm(cyc.dens ~ time + lake, data = counts)) # time
+TukeyHSD(aov(lm(cyc.dens ~ time + lake, data = counts)))
 
 # nauplii
 nauplii <- ggplot(counts, aes(x = time, y = nau.dens, color = lake, group = lake)) +
-  geom_point() + geom_line(linewidth = 1.1)
+  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Nauplii Density")
 nauplii
 dev.print(pdf, "zoop counts/figures/nauplii.pdf", height=10, width=15)
 dev.off
 Anova(lm(nau.dens ~ time + lake, data = counts)) # time
+TukeyHSD(aov(lm(nau.dens ~ time + lake, data = counts)))
 
 # ceriodaphnia
 ceriodaphnia <- ggplot(counts, aes(x = time, y = cerio.dens, color = lake, group = lake)) +
@@ -131,11 +133,12 @@ Anova(lm(poly.dens ~ time + lake, data = counts)) # no effect
 
 # asplancha
 asplancha <- ggplot(counts, aes(x = time, y = asp.dens, color = lake, group = lake)) +
-  geom_point() + geom_line(linewidth = 1.1)
+  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Asplancha Density")
 asplancha
 dev.print(pdf, "zoop counts/figures/asplancha.pdf", height=10, width=15)
 dev.off
 Anova(lm(asp.dens ~ time + lake, data = counts)) # time
+aov(lm(asp.dens ~ time + lake, data = counts)) 
 
 # chydorus
 chydorus <- ggplot(counts, aes(x = time, y = chy.dens, color = lake, group = lake)) +
@@ -155,21 +158,26 @@ combined.dens.plot <- ggarrange(daphnia + rremove("xlab") + theme(axis.title.y=e
                            cyclopoid + rremove("xlab") +  theme(axis.title.y=element_text(size=8)),
                            nauplii + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
                            asplancha + rremove("xlab") + theme(axis.title.y=element_text(size=8)), 
-                           holopedium + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
                            bosmina + rremove("xlab") +  theme(axis.title.y=element_text(size=8)),
-                           ceriodaphnia + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
-                           kellicotia + rremove("xlab") + theme(axis.title.y=element_text(size=8)), 
-                           keratella + rremove("xlab") + theme(axis.title.y=element_text(size=8)),
-                           labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"), nrow = 5, ncol = 2,
+                           labels = c("A", "B", "C", "D", "E", "F", "G"), nrow = 5, ncol = 2,
                            common.legend = TRUE, legend="bottom",
                            align="hv", font.label = list(size=10, color="black", family=NULL, position = "top"))
 combined.dens.plot
 final.combined.plot <- annotate_figure(combined.dens.plot, bottom = text_grob("Sampling Time Point", vjust = -6))
 final.combined.plot
-dev.print(pdf, "zoop counts/figures/final.combined.plot.pdf")
+dev.print(pdf, "zoop counts/figures/final.combined.plot.pdf", height=10, width=10)
 dev.off
 
+plots <- plot_grid(nauplii + theme(legend.position = "none"), calanoid + theme(legend.position = "none"), 
+                   cyclopoid + theme(legend.position = "none"), asplancha + theme(legend.position = "none"),
+                   labels = c('A', 'B', 'C', 'D'), label_size = 10)
 
+legend <- cowplot::get_legend(nauplii)
+
+combined_plot_legend <- cowplot::plot_grid(plots, NULL, legend, nrow = 2, rel_heights = c(3,1))
+combined_plot_legend
+dev.copy(pdf, "zoop counts/figures/combined_plot_legend.pdf", height=10, width=20)
+dev.off()
 ```
 
 
@@ -180,16 +188,20 @@ dev.off
 zoop.comm.div <- as.data.frame(vegan::diversity(counts[,c(20:31)], index="shannon"))
 zoop.comm.div <- cbind(zoop.comm.div, counts)
 names(zoop.comm.div)[1] <- "Shannon"
-zoop.comm.div.lakes <- vegan::diversity(counts[,c(20:31)], index="shannon", groups = counts$lake)
-zoop.comm.div.time <- vegan::diversity(counts[,c(20:31)], index="shannon", groups = counts$time)
+Anova(lm(Shannon ~ time + region, data = zoop.comm.div)) # no effect of time or lake on Shannon diversity
+stepAIC(lm(Shannon ~ latitude + longitude + DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = zoop.comm.div)) 
+summary(lm(Shannon ~ latitude + longitude + DO..perc + DOC + Chlorophyll.1..ug.L., data = zoop.comm.div))
 
 
-ggplot(zoop.comm.div, aes(time, ))
+ggplot(zoop.comm.div, aes(time, Shannon, color = time)) +
+  geom_point() +
+  geom_boxplot()
 
 # richness
 sample.r <- specnumber(counts[,c(20:31)])
 lake.r <- specnumber(counts[,c(20:31)], groups = counts$lake)
 time.r <- specnumber(counts[,c(20:31)], groups = counts$time)
+Anova(lm(richness ~ time + lake, data = counts)) # no effect of time or lake on richness
 
 
 ```
@@ -240,8 +252,6 @@ row.names(species_frequency) <- c('Daphnia', 'Calanoid', 'Cyclopoid', 'Nauplii',
 ```
 
 
-
-
 ```{r beta diversity and nmds}
 
 # bray curtis and nmds
@@ -272,13 +282,22 @@ nmds.counts
 
 ```{r effects of env. on densities}
 
-summary(lm(daphnia.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts)) #temp
-summary(lm(cal.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts)) #none
-summary(lm(cyc.dens ~  DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = counts)) #temp
-summary(lm(nau.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #temp
-summary(lm(bos.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #none
-summary(lm(ker.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #none
-summary(lm(kell.dens ~  temp..C + DOC + Chlorophyll.1..ug.L. + pH + DO..perc + cond, data = counts)) #none
+summary(lm(dens.row.sums ~  temp..C , data = counts)) # temp
+plot(counts$dens.row.sums, counts$temp..C)
+summary(lm(daphnia.dens ~  temp..C + DOC + pH + cond, data = counts)) #DOC,pH,temp
+summary(lm(cal.dens ~ longitude + pH, data = counts)) #longitude
+summary(lm(cyc.dens ~  latitude + longitude + temp..C + pH + DO..perc + cond, data = counts)) #lat, long, temp, DO, cond
+summary(lm(nau.dens ~  longitude + temp..C, data = counts)) #temp
+summary(lm(bos.dens ~  temp..C + Chlorophyll.1..ug.L. + DO..perc, data = counts)) #DO
+summary(lm(ker.dens ~  pH, data = counts)) #none
+summary(lm(kell.dens ~  latitude, data = counts)) #none
+
+
+# correlations
+ggscatter(counts, x = "cal.dens", y = "Chlorophyll.1..ug.L.",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "elevation (m)", ylab = "DOC")
 ```
 
 
