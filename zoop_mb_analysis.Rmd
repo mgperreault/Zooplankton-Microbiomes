@@ -119,7 +119,7 @@ str(sample_data(PS.fin))
 str(PS.fin)
 sample_data(PS.fin)$sequence_ID <- row.names(sample_data(PS.fin))
 view(sample_data(PS.fin))
-table(sample_data(PS.fin)$phy_group)
+table(sample_data(PS.fin)$sample_type)
 nsamples(PS.fin)
 ntaxa(PS.fin)
 head(taxa_sums(PS.fin))
@@ -215,6 +215,7 @@ C.abund <- transform_sample_counts(glom, function(x) x / sum(x))
 C.abund <- psmelt(C.abund)
 C.abund$Class <- as.character(C.abund$Class)
 avg.abund <- summaryBy(Abundance ~ Class, data = C.abund, FUN = mean)
+avg.abund.sam <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
 
 # finding the unique taxa names
 taxa_table <- tax_table(PS.fin)
@@ -419,7 +420,13 @@ microbe_rich_DOC <- ggplot(a.diversity, aes(x=DOC, y=Observed)) +
 microbe_rich_DOC
 dev.print(pdf, "phyloseq analysis/figures/microbe_rich_DOC.pdf", height=10, width=15)
 dev.off
-
+DOC_rich <- ggscatter(a.diversity, x = "DOC", y = "Observed",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "DOC", ylab = "ASV richness")
+DOC_rich
+dev.print(pdf, "phyloseq analysis/figures/DOC_rich.pdf", height=10, width=15)
+dev.off
 
 # summaryBy for averages and lm for regression model to conduct anova for significance
 lake_div <- summaryBy(Shannon ~ lake, data = a.diversity, FUN = c(median, mean, se))
@@ -559,7 +566,7 @@ dev.off()
 
 ```{r correlations}
 
-# cor.test(metadata$elevation_m, metadata$DOC)
+cor.test(sample_data(PS.hell)$latitude, sample_data(PS.hell)$chla_ug.L)
 
 ggscatter(sample_data(PS.hell), x = "elevation_m", y = "DOC",
           add = "reg.line", conf.int = TRUE, 
@@ -612,6 +619,25 @@ ggscatter(sample_data(PS.hell), x = "temp_C", y = "pH", color = "lake",
           cor.coef = TRUE, cor.method = "pearson",
           xlab = "temp_C", ylab = "pH")
 
+ggscatter(sample_data(PS.hell), x = "latitude", y = "DO_perc",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "DO")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "chla_ug.L",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "Chl a")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "cond",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "Conductivity")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "pH",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "pH")
 ```
 
 
@@ -773,7 +799,7 @@ anova(lm(NMDS1 ~ PC1*lake, data = NMDSxPCA_data))
 ```{r final envfit}
 
 # subset continuous environmental data
-env.hell <- sample_data(PS.hell)[ ,c(8:18)]
+env.hell <- sample_data(PS.hell)[ ,c(6,9:18)]
 
 # run the envfit function
 fit.env.hell <- envfit(nmds.hell, env.hell, na.rm = T)
@@ -781,17 +807,17 @@ fit.env.hell <- envfit(nmds.hell, env.hell, na.rm = T)
 
 # colors and groups for plots
 
-lake_colors <- c("blue","red", "purple2", "turquoise", "lightpink",  "orange")
-lake.group <- nmds.merge.hell$lake
+time_colors <- c("blue","red", "purple2", "turquoise", "lightpink")
+time.group <- nmds.merge.hell$time_point
 
 
 ### make plot by habitat with vectors for environment
-environm_plot <- ordiplot(nmds.merge.hell[,c(26,27)], type="n", main=substitute(paste("")), cex.main=1, display="sites", cex.lab=0.8, cex.axis=0.8)
+environm_plot <- ordiplot(nmds.merge.hell[,c(27,28)], type="n", main=substitute(paste("")), cex.main=1, display="sites", cex.lab=0.8, cex.axis=0.8)
 abline(h = 0, lty = "dotted")
 abline(v = 0, lty = "dotted")
 points(nmds.hell, "sites", cex=0.8, pch=16, col = "gray45")
-ordihull(environm_plot, groups=nmds.merge.hell$lake, draw="polygon", alpha=100, col = lake_colors)
-legend("topright", legend=levels(lake.group), cex=1, pch=16, col=unique(lake_colors), pt.cex=1, bty="n")
+ordihull(environm_plot, groups=nmds.merge.hell$time_point, draw="polygon", alpha=100, col = time_colors)
+legend("topright", legend=levels(time.group), cex=1, pch=16, col=unique(time_colors), pt.cex=1, bty="n")
 par.new=T
 plot(fit.env.hell, col="black", p.max=0.05, cex=0.9, lwd=1)
 dev.copy(pdf, "phyloseq analysis/figures/environm_plot.pdf", height=5.5, width=10)
