@@ -336,15 +336,6 @@ table(sample_data(PS.zoops)$sample_type)
 
 ```{r alpha diversity plots - plot_richness}
 
-#richness by Lake for zoops only
-richness.plot.location <- plot_richness(PS.fin, x="lake", measures=c("Shannon")) + 
-  labs(y= "Alpha Diversity Measure", x = "Lake") + theme_bw() + geom_boxplot() + 
-  theme(axis.text.x = element_text(angle = 90)) +
-  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
-richness.plot.location
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.location.pdf", height=5, width=7)
-dev.off()
-
 
 #richness by organism (or sample type i.e, water)
 richness.plot.organism <- plot_richness(PS.fin, x="sample_type", measures=c("Observed", "Shannon")) + 
@@ -365,11 +356,33 @@ dev.off()
 
 #richness by Time.point
 richness.plot.time.point <- plot_richness(PS.fin, x="time_point", measures=c("Observed")) + 
-  labs(y= "Alpha Diversity Measure", x = "Time Point") + theme_bw() + geom_boxplot() +
-  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
+  labs(y= "ASV Richness", x = "Sampling Time Point") + theme_bw() + geom_boxplot() +
+  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=16)) +
+  theme(strip.text.x = element_text(size = 20))
 richness.plot.time.point
 dev.copy(pdf, "phyloseq analysis/figures/richness.plot.time.point.pdf", height=5, width=7)
 dev.off() 
+
+
+#richness by Lake
+richness.plot.location <- plot_richness(PS.fin, x="lake", measures=c("Shannon")) + 
+  aes(color = sample_type) +
+  labs(y= "Shannon Diversity", x = "Lake") + theme_bw() + geom_boxplot() + 
+  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=16)) +
+  theme(strip.text.x = element_text(size = 20))
+richness.plot.location + geom_point(aes(color = sample_type), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.8))
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.location.pdf", height=5, width=7)
+dev.off()
+
+
+a.div.plots <- ggarrange(richness.plot.location + theme(axis.title.y=element_text(size=8)),
+                          richness.plot.time.point + theme(axis.title.y=element_text(size=8)),
+                           labels = c("A", "B"))
+a.div.plots
+dev.copy(pdf, "phyloseq analysis/figures/a.div.plots.pdf", height=10, width=20)
+dev.off()
 
 ```
 
@@ -384,20 +397,61 @@ row.names(a.diversity) <- row.names(sample_data(PS.fin))
 a.diversity <- cbind(a.diversity, sample_data(PS.fin)[,c(3,4,6,8,9:18,21:23)])
 view(a.diversity)
 
+# make some ggplots using this data
+s.div.lake <- ggplot(a.diversity, aes(x = lake, y = Shannon, color = sample_type)) +
+  geom_boxplot(lwd = 1,outlier.shape = NA) +  geom_point(aes(fill = sample_type), position = position_jitterdodge(),size = 2, pch = 21) +
+  scale_size(guide='none') + theme_bw() + 
+  labs(y= "Shannon Diversity", x = "Lake") +
+  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=20)) +
+  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=20)) +
+  theme(strip.text.x = element_text(size = 20))
+s.div.lake <- s.div.lake + scale_color_manual(values=c("#56B4E9", "#E69F00"),
+                       name="Sample Type",
+                       breaks=c("Water", "Zooplankton")) +
+  scale_fill_manual(values=c("#56B4E9", "#E69F00"),
+                    name="Sample Type",
+                       breaks=c("Water", "Zooplankton")) +
+  theme(legend.text = element_text(size = 16), 
+                                  legend.title = element_text(size = 20, face = "bold"), 
+                                  legend.key.size = unit(2, 'cm'))
+s.div.lake
+dev.copy(pdf, "phyloseq analysis/figures/s.div.lake.pdf", height=10, width=20)
+dev.off()
+
+richness.time <- ggplot(a.diversity, aes(x = time_point, y = Observed, color = sample_type)) +
+  geom_boxplot(lwd = 1,outlier.shape = NA) +  geom_point(aes(fill = sample_type), position = position_jitterdodge(),size = 2, pch = 21) +
+  scale_size(guide='none') + theme_bw() + labs(y= "ASV Richness", x = "Sampling Time Point") +
+  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=20)) +
+  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=20)) +
+  theme(strip.text.x = element_text(size = 20)) + 
+  scale_color_manual(values=c("#56B4E9", "#E69F00"),
+                       name="Sample Type",
+                       breaks=c("Water", "Zooplankton")) +
+  scale_fill_manual(values=c("#56B4E9", "#E69F00"),
+                       name="Sample Type",
+                       breaks=c("Water", "Zooplankton")) +
+  theme(legend.position="none")
+
+combined_divplot_legend <- ggarrange(s.div.lake, richness.time, labels = c("A", "B"), common.legend = TRUE, legend="bottom")
+combined_divplot_legend
+dev.copy(pdf, "phyloseq analysis/figures/combined_divplot_legend.pdf", height=10, width=20)
+dev.off()
 
 # bell curve/ normally distributed, so we can use anova
 hist(a.diversity$Shannon, main="Shannon diversity", xlab="", breaks=10)
 shapiro.test(a.diversity$Shannon)
 
 # Testing effects on Shannon diversity index
-anova(lm(Shannon ~ lake + time_point + sample_type, data = a.diversity))
-shan.anova <- aov(lm(Shannon ~ lake + time_point + sample_type, data = a.diversity))
-TukeyHSD(shan.anova) # shows that Serene is highly different from all the other lakes and is driving the significant difference
+anova(lm(Shannon ~ lake, data = a.diversity))
+shan.anova <- aov(lm(Shannon ~ lake, data = a.diversity))
+tukey <- TukeyHSD(shan.anova) # shows that Serene is highly different from all the other lakes and is driving the significant difference
+cld <- multcompLetters4(shan.anova, tukey)
 
 # Testing effects on observed richness
-anova(lm(Observed ~ lake + time_point + sample_type, data = a.diversity))
-rich.anova <- aov(lm(Observed ~ lake + time_point + sample_type + phy_group + basin, data = a.diversity))
-TukeyHSD(rich.anova) # again, Serene is driving the significant difference
+anova(lm(Observed ~ time_point, data = a.diversity))
+rich.anova <- aov(lm(Observed ~ time_point, data = a.diversity))
+tukey <- TukeyHSD(rich.anova) # again, Serene is driving the significant difference
+cld <- multcompLetters4(rich.anova, tukey)
 
 # testing effects of environmental variables on Shannon diversity and ASV richness
 a.div.mod <- lm(Shannon ~ temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond, data = a.diversity)
