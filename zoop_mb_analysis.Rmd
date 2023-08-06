@@ -210,24 +210,13 @@ permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
 ```{r top average taxa compositions}
 
 # finding average abundance of each class of bacteria for samples overall
-glom <- tax_glom(PS.fin, taxrank = 'Class')
-C.abund <- transform_sample_counts(glom, function(x) x / sum(x))
-C.abund <- psmelt(C.abund)
-C.abund$Class <- as.character(C.abund$Class)
-avg.abund <- summaryBy(Abundance ~ Class, data = C.abund, FUN = mean)
-avg.abund.sam <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
+#glom <- tax_glom(PS.fin, taxrank = 'Class')
+#C.abund <- transform_sample_counts(glom, function(x) x / sum(x))
+#C.abund <- psmelt(C.abund)
+#avg.abund <- summaryBy(Abundance ~ Class, data = C.abund, FUN = mean)
+#avg.abund.sam <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
 
-# finding the unique taxa names
-taxa_table <- tax_table(PS.fin)
-taxa_order <- taxa_table[, "Order"]
-unique_order <- as.data.frame(unique(taxa_class))
-unique_classes <- as.data.frame(get_taxa_unique(PS.hell, "Family"))
-
-
-# another way, based on frequency not averages
-all_class <- table(tax_table(PS.hell)[,"Class"])
-sorted_class <- sort(all_class, decreasing = T)
-top_class <- names(sorted_class)[1:5]
+a <- summaryBy(rel_abund ~ Class*sample_type, data = Abund.final, FUN = mean)
 
 ```
 
@@ -1639,18 +1628,6 @@ dev.off()
 
 
 ```{r stacked bar plots}
-
-
-ASV_rel_abund_hell <- transform_sample_counts(PS.hell, function(x) x/sum(x))
-ASV_dataframe_hell <- psmelt(ASV_rel_abund_hell)
-Abund.hell <- aggregate(Abundance ~ sequence_ID + time_point + lake + organism_water + phy_group + sample_type +
-                     Phylum + Class + Order + Family +
-                     Genus+Species, data=ASV_dataframe_hell, FUN=mean)
-
-# remove rare
-common_subset <- subset(ASV_dataframe_hell, ASV_dataframe_hell$Abundance > 0.01)
-Abund.class <- aggregate(Abundance ~ Class, data=common_subset, FUN=mean)
-
 
 # trying something
 ASV_rel_abund_hell <- transform_sample_counts(PS.fin, function(x) x/sum(x))
