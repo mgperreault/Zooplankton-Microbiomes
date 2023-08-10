@@ -177,6 +177,8 @@ nmds.merge.hell <- merge(sample_data(PS.hell), species.scores.hell, by = 'row.na
 set.seed(10000)
 hell.model <- adonis2(bc.hell ~ lake*time_point + phy_group, data = nmds.merge.hell, permutations = 1000)
 hell.model
+write.table(hell.model, "hell.model.txt", sep = "\t", quote = FALSE)
+kable(hell.model, digits = 3)
 
 set.seed(10000)
 hell.model.env <- adonis2(bc.hell ~ temp_C, data = nmds.merge.hell, permutations = 1000)
@@ -435,7 +437,7 @@ hist(a.diversity$Shannon, main="Shannon diversity", xlab="", breaks=10)
 shapiro.test(a.diversity$Shannon)
 
 # Testing effects on Shannon diversity index
-Anova(lm(Shannon ~ lake, data = a.diversity))
+adonis2(Shannon ~ lake*time_point*phy_group, data = a.diversity)
 shan.anova <- aov(lm(Shannon ~ lake, data = a.diversity))
 tukey <- TukeyHSD(shan.anova) 
 cld <- multcompLetters4(shan.anova, tukey)
@@ -451,6 +453,10 @@ microbe_div_phyto <- ggplot(a.diversity, aes(x=cond, y=Shannon)) +
 microbe_div_phyto
 dev.print(pdf, "phyloseq analysis/figures/microbe_div_phyto.pdf", height=10, width=15)
 dev.off
+ggscatter(a.diversity, x = "cond", y = "Shannon",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson", cor.coef.coord = c(0.65,2.98),
+          xlab = "Temperature", ylab = "Zooplankton Community Shannon Diversity")
 
 
 # summaryBy for averages and lm for regression model to conduct anova for significance
@@ -572,7 +578,7 @@ step(FitAll.actino, direction = "both") # DO
 summary(lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + cond + 
     chla_ug.L, data = actinobacteria)) # DO, pH, cond
 
-actino_DO <- ggplot(actinobacteria, aes(x=DO_perc, y=Abundance.sum)) +
+actino_DO <- ggplot(actinobacteria, aes(x=DO_perc, y=rel_abund.sum)) +
   geom_point() +
   geom_smooth() + xlab("Dissolved Oxygen (%)") + ylab("Actinobacteria Abundance") +
   theme(axis.text.x=element_text(size=14)) + theme(axis.title.x=element_text(size=16)) +
@@ -581,7 +587,7 @@ actino_DO
 dev.copy(pdf, "phyloseq analysis/figures/actino_DO.pdf", height=6, width=10)
 dev.off()
 
-actino_DO <- ggscatter(actinobacteria, x = "DO_perc", y = "Abundance.sum",
+actino_DO <- ggscatter(actinobacteria, x = "DO_perc", y = "rel_abund.sum",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.coeff.args = list( method = "pearson"), cor.coef.coord = c(65,0.45),
           xlab = ("Dissolved Oxygen (%)"), ylab = ("Actinobacteria Abundance"))
