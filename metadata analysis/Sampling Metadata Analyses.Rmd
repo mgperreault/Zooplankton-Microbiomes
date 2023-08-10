@@ -56,7 +56,7 @@ lakeDOC.df$Date<-as.factor(lakeDOC.df$Date)
 str(lakeDOC.df)
 
 log.DOC.plot<-ggplot(lakeDOC.df, aes(x=Time.Point, y=DOC_values, group=Lake, color=Lake)) +
-  scale_y_log10() + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + 
+  scale_y_log10() + geom_line() + scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) +
   xlab("Sampling Time Point") + ylab(expression(paste("log(DOC)", ~(mg~L^-1), sep = ""))) +
   theme(text = element_text(size = 10))
 log.DOC.plot
@@ -80,7 +80,7 @@ str(chla.df)
 
 chla.df$Chlorophyll.1..ug.L<-as.numeric(chla.df$Chlorophyll.1..ug.L)
 
-chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chl-a", ~(mu*g~ L^-1), sep = "")))
+chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chl-a", ~(mu*g~ L^-1), sep = "")))
 chla.plot
 dev.print(pdf, "figures/chla.plot.pdf")
 dev.off
@@ -102,7 +102,7 @@ lakeDO.df$Date<-as.factor(lakeDO.df$Date)
 str(lakeDO.df)
 
 DO.percent.plot<-ggplot(lakeDO.df, aes(x=Time.Point, y=DO..perc, group=Lake, color=Lake)) + geom_line() + 
-  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("DO (%)") +
+  scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + ylab("DO (%)") +
   theme(text = element_text(size = 10))
 DO.percent.plot
 dev.print(pdf, "figures/DO.percent.plot.pdf")
@@ -125,7 +125,7 @@ str(lakeCond.df)
 
 conductivity.plot<-ggplot(lakeCond.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) +
   geom_line() + theme(axis.text.x = element_text(size = 10)) +
-  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") +
+  scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") +
   ylab(expression(paste("Conductivity", ~(mu*S~ cm^-1), sep = "")))
 conductivity.plot
 dev.print(pdf, "figures/conductivity.plot.pdf")
@@ -164,7 +164,7 @@ lakepH.df$Date<-as.factor(lakepH.df$Date)
 str(lakepH.df)
 
 pH.plot<-ggplot(lakepH.df, aes(x=Time.Point, y=pH, group=Lake, color=Lake)) + geom_line() +
-  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") +
+  scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") +
   theme(text = element_text(size = 10))
 pH.plot
 dev.print(pdf, "figures/pH.plot.pdf")
@@ -189,7 +189,7 @@ laketemp.df$Date<-as.factor(laketemp.df$Date)
 str(laketemp.df)
 
 laketemp.plot<-ggplot(laketemp.df, aes(x=Time.Point, y=temp..C, group=Lake, color=Lake)) + geom_line() +
-  scale_color_brewer(type = "qual", palette = "Dark2") + xlab("Sampling Time Point") + ylab("Temperature(°C)") +
+ scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + ylab("Temperature(°C)") +
   theme(text = element_text(size = 10)) 
 laketemp.plot
 dev.print(pdf, "figures/laketemp.plot.pdf")
@@ -202,12 +202,19 @@ dev.off
 avg.temp <- c(18,18.5,19,17.5,18,18.5,22.5,22,19.5,16,18.5,21.5,21.5)
 rain.total <- c(0,0,0,0,0,0,0,0,0.6,1.6,2.2,0,0)
 TimePoint <- c('June-25', 'June-26', 'June-29', 'July-6', 'July-7', 'July-9', 'July-21', 'July-22', 'Aug-4', 'Aug-5', 'Aug-9', 'Aug-21', 'Aug-23')
-weather <- data.frame(Dates = TimePoint, Temperature = avg.temp, Precipitation = rain.total)
+date <- as.Date(c("2022-06-25", "2022-06-26", "2022-06-29", "2022-07-06", "2022-07-07", "2022-07-09", "2022-07-21", "2022-07-22", "2022-08-04", "2022-08-05", "2022-08-09", "2022-08-21", "2022-08-23"))
+weather <- data.frame(date = date, temperature = avg.temp, precipitation = rain.total)
+weather <- weather[weather$date > as.Date(c("2022-06-25", "2022-06-26", "2022-06-29", "2022-07-06", "2022-07-07", "2022-07-09", "2022-07-21", "2022-07-22", "2022-08-04", "2022-08-05", "2022-08-09", "2022-08-21", "2022-08-23")), ] %>%
+  filter(variable == "weather$temperature" | variable == "weather$precipitation")
 
 
-weather.plot <- ggplot(weather, aes(x=fct_inorder(TimePoint))) +
-  geom_line(aes(y=Temperature, group=1, color="Temperature"), size=1.5) + 
-  geom_line(aes(y=Precipitation, group=1, color="Precipitation"), size=1.5) +
+weather.plot <- ggplot(weather, aes(x=fct_inorder(date))) +
+  geom_line(aes(y=temperature, group=1, color="temperature"), linewidth=1.5) + 
+  geom_line(aes(y=precipitation, group=1, color="precipitation"), linewidth=1.5) +
+  scale_x_date(
+    date_breaks = "1 day",
+    date_labels = "%Y-%m-%d"
+  ) +
   scale_color_manual(values = c("Temperature" = "orangered", "Precipitation" = "steelblue")) +
   labs(x="Sampling Date", y="Average Air Temperature (°C)") +
   theme_bw()+ theme(axis.text.x = element_text(angle = 90))
@@ -220,6 +227,27 @@ weather.plot <- weather.plot + scale_y_continuous(
 weather.plot
 dev.print(pdf, "figures/weather.plot.plot.pdf")
 dev.off
+
+
+weather.plot <- ggplot(weather, aes(x = date)) +
+  geom_line(aes(y = temperature, color = "temperature"), linewidth = 1.2, linetype = "solid") +
+  geom_line(aes(y = precipitation, color = "precipitation"), linewidth = 1.2, linetype = "solid") +
+  labs(x = "Date", y = "Air Temperature (°C)", title = NULL) + 
+  scale_color_manual(
+    values = c("precipitation" = "steelblue", "temperature" = "orangered"), breaks = c("temperature", "precipitation")
+  ) +
+theme(axis.text.x = element_text(angle = 90))
+weather.plot
+dev.print(pdf, "figures/weather.plot.plot.pdf")
+dev.off
+
+weather.plot <- weather.plot + scale_y_continuous(
+  sec.axis = sec_axis(~./1, name = "Total Daily Precipitation (mm)")) +
+  scale_x_date(breaks = "1 week", date_labels = "%b %d")
+weather.plot
+dev.print(pdf, "figures/weather.plot.plot.pdf", width = 10, height = 6)
+dev.off
+
 ```
 
 
