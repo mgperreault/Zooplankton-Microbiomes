@@ -154,9 +154,11 @@ max(sample_data(PS.fin)$read_depth)
 ```
 
 
+
 ```{r Hellinger transformation (instead of rarefy)}
 # Hellinger (square root) transform the data!
 PS.hell = transform_sample_counts(PS.fin, function(x) x^0.5)
+
 set.seed(10000)
 # Bray Curtis dissimilarity matrix
 bc.hell <- phyloseq::distance(PS.hell, method = "bray")
@@ -175,10 +177,9 @@ nmds.merge.hell <- merge(sample_data(PS.hell), species.scores.hell, by = 'row.na
 
 # estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
 set.seed(10000)
-hell.model <- adonis2(bc.hell ~ lake*time_point + phy_group, data = nmds.merge.hell, permutations = 1000)
+hell.model <- adonis2(bc.hell ~ lake*time_point*phy_group, data = nmds.merge.hell, permutations = 1000)
 hell.model
-write.table(hell.model, "hell.model.txt", sep = "\t", quote = FALSE)
-kable(hell.model, digits = 3)
+
 
 set.seed(10000)
 hell.model.env <- adonis2(bc.hell ~ temp_C, data = nmds.merge.hell, permutations = 1000)
@@ -192,7 +193,8 @@ install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
 library(pairwiseAdonis)
 
 # post hoc pairwise comparison to see what's driving the significance:
-pairwise.adonis2(bc.hell ~ time_point, data = nmds.merge.hell)
+pairwise.adonis2(bc.hell ~ time_point*phy_group, data = nmds.merge.hell)
+set.seed(10000)
 pairwise.adonis2(bc.hell ~ phy_group, data = nmds.merge.hell)
 pairwise.adonis2(bc.hell ~ lake, data = nmds.merge.hell)
 
@@ -203,8 +205,67 @@ permutest(betadisper(bc.hell, nmds.merge.hell$temp_C), pairwise = T)
 permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
 # time is significant in the betadisper, sample_type and phy_group are not
 
-# testing this anosim function out since time did not pass homogeneity test
+#testing this anosim function out since time did not pass homogeneity test
 #anosim(bc.hell, nmds.merge.hell$time_point, permutations = 1000)
+
+```
+
+
+```{r testing differences between zoops and water}
+PS.fin.zoops <- subset_samples(PS.fin, sample_type == "Zooplankton")
+PS.hell.zoops = transform_sample_counts(PS.fin.zoops, function(x) x^0.5)
+
+bc.hell.zoops <- phyloseq::distance(PS.hell.zoops, method = "bray")
+
+set.seed(10000)
+nmds.hell.zoops <- metaMDS(bc.hell.zoops,
+          distance = "bray",
+          k = 3,
+          maxit = 999, 
+          wascores = TRUE)
+stress_result.zoops <- nmds.hell.zoops$stress
+species.scores.hell.zoops <- as.data.frame(scores(nmds.hell.zoops))
+nmds.merge.hell.zoops <- merge(sample_data(PS.hell.zoops), species.scores.hell.zoops, by = 'row.names', all = TRUE)
+
+
+# estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
+set.seed(10000)
+hell.model.zoops <- adonis2(bc.hell.zoops ~ lake*time_point, data = nmds.merge.hell.zoops, permutations = 1000)
+hell.model.zoops
+
+
+set.seed(10000)
+hell.model.env.zoops <- adonis2(bc.hell.zoops ~ temp_C, data = nmds.merge.hell.zoops, permutations = 1000)
+hell.model.env.zoops
+
+#######
+
+PS.fin.water <- subset_samples(PS.fin, sample_type == "Water")
+PS.hell.water = transform_sample_counts(PS.fin.water, function(x) x^0.5)
+
+bc.hell.water <- phyloseq::distance(PS.hell.water, method = "bray")
+
+set.seed(10000)
+nmds.hell.water <- metaMDS(bc.hell.water,
+          distance = "bray",
+          k = 3,
+          maxit = 999, 
+          wascores = TRUE)
+stress_result.water <- nmds.hell.water$stress
+species.scores.hell.water <- as.data.frame(scores(nmds.hell.water))
+nmds.merge.hell.water <- merge(sample_data(PS.hell.water), species.scores.hell.water, by = 'row.names', all = TRUE)
+
+
+# estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
+set.seed(10000)
+hell.model.water <- adonis2(bc.hell.water ~ time_point, data = nmds.merge.hell.water, permutations = 1000)
+hell.model.water
+
+
+set.seed(10000)
+hell.model.env.water <- adonis2(bc.hell.water ~ temp_C, data = nmds.merge.hell.water, permutations = 1000)
+hell.model.env.water
+
 
 ```
 
@@ -437,7 +498,7 @@ hist(a.diversity$Shannon, main="Shannon diversity", xlab="", breaks=10)
 shapiro.test(a.diversity$Shannon)
 
 # Testing effects on Shannon diversity index
-adonis2(Shannon ~ lake*time_point*phy_group, data = a.diversity)
+Anova(lm(Shannon ~ lake, data = a.diversity))
 shan.anova <- aov(lm(Shannon ~ lake, data = a.diversity))
 tukey <- TukeyHSD(shan.anova) 
 cld <- multcompLetters4(shan.anova, tukey)
@@ -1061,7 +1122,7 @@ spatial_dist <- as.dist(spatial_dist)
 spatial_dist_km <- as.dist(spatial_dist_km) # make distance matrix
 
 # run the Mantel test
-vegan::mantel(spatial_dist_km, bc.hell)
+mantel <-vegan::mantel(spatial_dist_km, bc.hell)
 # observation value in the output is the observed correlation (r) and shows sign (pos or neg corr.)
 
 # plotting
@@ -1195,7 +1256,7 @@ str(nmds2.merge)
 
 
 nmds.convict <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Convict", ], aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color = time_point), size = 2.5) +
+  geom_point(aes(color = time_point, shape = phy_group), size = 2.5) +
   stat_ellipse(level=0.9, lwd = 0.8, linetype = 2, aes(color = time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) +
   theme_bw() + ggtitle("Convict") +
@@ -1205,14 +1266,14 @@ nmds.convict <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Convict", ], aes
   theme(legend.key.size = unit(1, 'cm'), #change legend key size
         legend.key.height = unit(1, 'cm'), #change legend key height
         legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=30), #change legend title font size
-        legend.text = element_text(size=28)) #change legend text font size
+        legend.title = element_text(size=13), #change legend title font size
+        legend.text = element_text(size=11)) #change legend text font size
 nmds.convict
 dev.print(pdf, "phyloseq analysis/figures/nmds.convict.pdf", height=10, width=15)
 dev.off
 
 nmds.east.brook <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Eastern Brook", ], aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color = time_point), size = 2.5) +
+  geom_point(aes(color = time_point, shape = phy_group), size = 2.5) +
   stat_ellipse(level=0.9, lwd = 0.8, linetype = 2, aes(color = time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) +
   theme_bw() + ggtitle("Eastern Brook") +
@@ -1222,14 +1283,14 @@ nmds.east.brook <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Eastern Brook
   theme(legend.key.size = unit(1, 'cm'), #change legend key size
         legend.key.height = unit(1, 'cm'), #change legend key height
         legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=30), #change legend title font size
-        legend.text = element_text(size=28)) #change legend text font size
+        legend.title = element_text(size=13), #change legend title font size
+        legend.text = element_text(size=11)) #change legend text font size
 nmds.east.brook
 dev.print(pdf, "phyloseq analysis/figures/nmds.east.brook.pdf", height=10, width=15)
 dev.off
 
 nmds.serene <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Serene", ], aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color = time_point), size = 2.5) +
+  geom_point(aes(color = time_point, shape = phy_group), size = 2.5) +
   stat_ellipse(level=0.9, lwd = 0.8, linetype = 2, aes(color = time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) +
   theme_bw() + ggtitle("Serene") +
@@ -1239,14 +1300,14 @@ nmds.serene <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Serene", ], aes(x
   theme(legend.key.size = unit(1, 'cm'), #change legend key size
         legend.key.height = unit(1, 'cm'), #change legend key height
         legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=30), #change legend title font size
-        legend.text = element_text(size=28)) #change legend text font size
+        legend.title = element_text(size=13), #change legend title font size
+        legend.text = element_text(size=11)) #change legend text font size
 nmds.serene
 dev.print(pdf, "phyloseq analysis/figures/nmds.serene.pdf", height=10, width=15)
 dev.off
 
 nmds.cooney <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Cooney", ], aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color = time_point), size = 2.5) +
+  geom_point(aes(color = time_point, shape = phy_group), size = 2.5) +
   stat_ellipse(level=0.9, lwd = 0.8, linetype = 2, aes(color = time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) +
   theme_bw() + ggtitle("Cooney") +
@@ -1256,14 +1317,14 @@ nmds.cooney <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Cooney", ], aes(x
   theme(legend.key.size = unit(1, 'cm'), #change legend key size
         legend.key.height = unit(1, 'cm'), #change legend key height
         legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=30), #change legend title font size
-        legend.text = element_text(size=28)) #change legend text font size
+        legend.title = element_text(size=13), #change legend title font size
+        legend.text = element_text(size=11)) #change legend text font size
 nmds.cooney
 dev.print(pdf, "phyloseq analysis/figures/nmds.cooney.pdf", height=10, width=15)
 dev.off
 
 nmds.blue <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Blue", ], aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color = time_point), size = 2.5) +
+  geom_point(aes(color = time_point, shape = phy_group), size = 2.5) +
   stat_ellipse(level=0.9, lwd = 0.8, linetype = 2, aes(color = time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) +
   theme_bw() + ggtitle("Blue") +
@@ -1273,14 +1334,14 @@ nmds.blue <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Blue", ], aes(x=NMD
   theme(legend.key.size = unit(1, 'cm'), #change legend key size
         legend.key.height = unit(1, 'cm'), #change legend key height
         legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=30), #change legend title font size
-        legend.text = element_text(size=28)) #change legend text font size
+        legend.title = element_text(size=13), #change legend title font size
+        legend.text = element_text(size=11)) #change legend text font size
 nmds.blue
 dev.print(pdf, "phyloseq analysis/figures/nmds.blue.pdf", height=10, width=15)
 dev.off
 
 nmds.virginia <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Virginia", ], aes(x=NMDS1, y=NMDS2)) +
-  geom_point(aes(color = time_point), size = 2.5) +
+  geom_point(aes(color = time_point, shape = phy_group), size = 2.5) +
   stat_ellipse(level=0.9, lwd = 0.8, linetype = 2, aes(color = time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) +
   theme_bw() + ggtitle("Virginia") +
@@ -1290,8 +1351,8 @@ nmds.virginia <- ggplot(nmds.merge.hell[nmds.merge.hell$lake == "Virginia", ], a
   theme(legend.key.size = unit(1, 'cm'), #change legend key size
         legend.key.height = unit(1, 'cm'), #change legend key height
         legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=30), #change legend title font size
-        legend.text = element_text(size=28)) #change legend text font size
+        legend.title = element_text(size=13), #change legend title font size
+        legend.text = element_text(size=11)) #change legend text font size
 nmds.virginia
 dev.print(pdf, "phyloseq analysis/figures/nmds.virginia.pdf", height=10, width=15)
 dev.off
@@ -1370,8 +1431,8 @@ nmds.zoops.time.basin
 ```{r General NMDS}
 
 nmds.time <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = time_point)) +
-  geom_point(aes(color = time_point), size = 2.4) + 
-  stat_ellipse(level=0.9, lwd = 1, linetype = 2, aes(color=time_point)) +
+  geom_point(aes(color = time_point), size = 3) + 
+  stat_ellipse(level=0.9, lwd = 1.2, linetype = 2, aes(color=time_point)) +
   scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) + 
   theme_bw() +
   theme(axis.text.x=element_text(size=18)) + theme(axis.title.x=element_text(size=20)) +

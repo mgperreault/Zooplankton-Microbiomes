@@ -138,8 +138,8 @@ dev.off
 Anova(lm(poly.dens ~ time + lake, data = counts)) # no effect
 
 # asplancha
-asplancha <- ggplot(counts, aes(x = time, y = asp.dens, color = lake, group = lake)) +
-  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Asplancha Density (#/L)") +
+asplanchna <- ggplot(counts, aes(x = time, y = asp.dens, color = lake, group = lake)) +
+  geom_point(size = 2) + geom_line(linewidth = 1.1) + labs( x = "Sampling Time Point", y = "Asplanchna Density (#/L)") +
   scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen"))
 asplancha
 dev.print(pdf, "zoop counts/figures/asplancha.pdf", height=10, width=15)
@@ -155,7 +155,6 @@ dev.print(pdf, "zoop counts/figures/chydorus.pdf", height=10, width=15)
 dev.off
 Anova(lm(chy.dens ~ time + lake, data = counts)) # no effect
 
-
 library("patchwork")
 library("ggpubr")
 
@@ -165,7 +164,7 @@ combined.dens.plot <- ggarrange(
                            calanoid + theme(axis.title.y=element_text(size=8)),
                            cyclopoid + theme(axis.title.y=element_text(size=8)),
                            nauplii + theme(axis.title.y=element_text(size=8)),
-                           asplancha + theme(axis.title.y=element_text(size=8)),
+                           asplanchna + theme(axis.title.y=element_text(size=8)),
                            labels = c("(a)", "(b)", "(c)", "(d)", "(e)"), nrow = 2, ncol = 3,
                            common.legend = TRUE, legend="right",
                            align="hv", font.label = list(size=10, color="black", family=NULL, position = "top"))
@@ -181,7 +180,12 @@ dev.off
 
 
 ```{r stacked bar plot}
+
+
 long_counts <- tidyr::pivot_longer(data = counts, cols = c(23:34), names_to = c("Taxa", "Density"), names_sep = "_",)
+long_counts <- as.data.frame(long_counts)
+Anova(lm(value ~ time + lake, data = long_counts))
+
 
 zoop_abundances_plot <- ggplot(long_counts, aes(x=time, y=value, fill=Taxa, color=Taxa)) +
   geom_bar(aes(fill=Taxa, color=Taxa), stat="identity", position="fill") +
@@ -206,7 +210,7 @@ dev.off()
 zoop.comm.div <- as.data.frame(vegan::diversity(counts[,c(23:34)], index="shannon"))
 zoop.comm.div <- cbind(zoop.comm.div, counts)
 names(zoop.comm.div)[1] <- "Shannon"
-Anova(lm(Shannon ~ lake, data = zoop.comm.div)) # no effect of time or lake on Shannon diversity
+Anova(lm(Shannon ~ lake + time, data = zoop.comm.div)) # no effect of time or lake on Shannon diversity
 stepAIC(lm(Shannon ~ latitude + longitude + DO..perc + DOC + Chlorophyll.1..ug.L. + pH + cond + temp..C, data = zoop.comm.div)) 
 summary(lm(Shannon ~ latitude + cond + temp..C, data = zoop.comm.div))
 ggscatter(zoop.comm.div, x = "temp..C", y = "Shannon",

@@ -56,7 +56,7 @@ lakeDOC.df$Date<-as.factor(lakeDOC.df$Date)
 str(lakeDOC.df)
 
 log.DOC.plot<-ggplot(lakeDOC.df, aes(x=Time.Point, y=DOC_values, group=Lake, color=Lake)) +
-  scale_y_log10() + geom_line() + scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) +
+  scale_y_log10() + geom_line(linewidth = 1.1) +  geom_point(size = 2)+  scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) +
   xlab("Sampling Time Point") + ylab(expression(paste("log(DOC)", ~(mg~L^-1), sep = ""))) +
   theme(text = element_text(size = 10))
 log.DOC.plot
@@ -80,7 +80,7 @@ str(chla.df)
 
 chla.df$Chlorophyll.1..ug.L<-as.numeric(chla.df$Chlorophyll.1..ug.L)
 
-chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line() + scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chl-a", ~(mu*g~ L^-1), sep = "")))
+chla.plot<- ggplot(chla.df, aes(x= Time.Sample, y=Chlorophyll.1..ug.L, group=Lake, color=Lake)) + geom_line(linewidth = 1.1) +  geom_point(size = 2)+ scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + theme(axis.text = element_text(size=7)) +  ylab(expression(paste("Chl-a", ~(mu*g~ L^-1), sep = "")))
 chla.plot
 dev.print(pdf, "figures/chla.plot.pdf")
 dev.off
@@ -101,7 +101,7 @@ lakeDO.df$Date<-as.factor(lakeDO.df$Date)
 
 str(lakeDO.df)
 
-DO.percent.plot<-ggplot(lakeDO.df, aes(x=Time.Point, y=DO..perc, group=Lake, color=Lake)) + geom_line() + 
+DO.percent.plot<-ggplot(lakeDO.df, aes(x=Time.Point, y=DO..perc, group=Lake, color=Lake)) + geom_line(linewidth = 1.1) +  geom_point(size = 2)+ 
   scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + ylab("DO (%)") +
   theme(text = element_text(size = 10))
 DO.percent.plot
@@ -124,7 +124,7 @@ lakeCond.df$Date<-as.factor(lakeCond.df$Date)
 str(lakeCond.df)
 
 conductivity.plot<-ggplot(lakeCond.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) +
-  geom_line() + theme(axis.text.x = element_text(size = 10)) +
+  geom_line(linewidth = 1.1) +  geom_point(size = 2) + theme(axis.text.x = element_text(size = 10)) +
   scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") +
   ylab(expression(paste("Conductivity", ~(mu*S~ cm^-1), sep = "")))
 conductivity.plot
@@ -143,8 +143,7 @@ lake_spc.df$Time.Point<-as.factor(lake_spc.df$Time.Point)
 
 str(lake_spc.df)
 
-spc.plot <- ggplot(lake_spc.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) + geom_line() + scale_color_brewer(type = "qual", palette = "Dark2") + ylab(expression(paste("spc", ~(mu*S~ cm^-1)))) + xlab("Sampling Time Point") + ylab("spc")
-
+spc.plot <- ggplot(lake_spc.df, aes(x=Time.Point, y=cond, group=Lake, color=Lake)) + geom_line(linewidth = 1.1) +  geom_point(size = 2)+ scale_color_brewer(type = "qual", palette = "Dark2") + ylab(expression(paste("spc", ~(mu*S~ cm^-1)))) + xlab("Sampling Time Point") + ylab("spc")
 spc.plot
 dev.print(pdf, "figures/spc.plot.pdf")
 dev.off
@@ -163,7 +162,7 @@ lakepH.df$Date<-as.factor(lakepH.df$Date)
 
 str(lakepH.df)
 
-pH.plot<-ggplot(lakepH.df, aes(x=Time.Point, y=pH, group=Lake, color=Lake)) + geom_line() +
+pH.plot<-ggplot(lakepH.df, aes(x=Time.Point, y=pH, group=Lake, color=Lake)) + geom_line(linewidth = 1.1) +  geom_point(size = 2)+
   scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") +
   theme(text = element_text(size = 10))
 pH.plot
@@ -188,7 +187,7 @@ laketemp.df$Date<-as.factor(laketemp.df$Date)
 
 str(laketemp.df)
 
-laketemp.plot<-ggplot(laketemp.df, aes(x=Time.Point, y=temp..C, group=Lake, color=Lake)) + geom_line() +
+laketemp.plot<-ggplot(laketemp.df, aes(x=Time.Point, y=temp..C, group=Lake, color=Lake)) + geom_line(linewidth = 1.1) +  geom_point(size = 2)+
  scale_color_manual(values = c("royalblue", "darkorchid4", "chartreuse2", "orange2", "violet", "darkgreen")) + xlab("Sampling Time Point") + ylab("Temperature(°C)") +
   theme(text = element_text(size = 10)) 
 laketemp.plot
@@ -228,13 +227,14 @@ weather.plot
 dev.print(pdf, "figures/weather.plot.plot.pdf")
 dev.off
 
-
+weather <- read.csv('weather.csv',header = TRUE)
+weather$date <- as.Date(weather$date)
 weather.plot <- ggplot(weather, aes(x = date)) +
-  geom_line(aes(y = temperature, color = "temperature"), linewidth = 1.2, linetype = "solid") +
-  geom_line(aes(y = precipitation, color = "precipitation"), linewidth = 1.2, linetype = "solid") +
-  labs(x = "Date", y = "Air Temperature (°C)", title = NULL) + 
+  geom_line(aes(y = avg.temp, color = "avg.temp"), linewidth = 1.2, linetype = "solid") +
+  geom_line(aes(y = rain.total, color = "rain.total"), linewidth = 1.2, linetype = "solid") +
+  labs(x = "Date", y = "Average Air Temperature (°C)", title = NULL) + 
   scale_color_manual(
-    values = c("precipitation" = "steelblue", "temperature" = "orangered"), breaks = c("temperature", "precipitation")
+    values = c("rain.total" = "steelblue", "avg.temp" = "orangered"), breaks = c("avg.temp", "rain.total")
   ) +
 theme(axis.text.x = element_text(angle = 90))
 weather.plot
