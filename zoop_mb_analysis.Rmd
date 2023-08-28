@@ -80,7 +80,7 @@ row.names(metadata) <- metadata$X
 ```
 
 
-```{r making phyloseq objects}
+```{r making the phyloseq object}
 
 PS.fin<-
   read_phyloseq(
@@ -134,6 +134,7 @@ table(sample_data(PS.fin)$phy_group)
 
 # Make a data frame with a column for the read counts of each sample
 sample_data(PS.fin)$read_depth <- sample_sums(PS.fin)
+
 mean(sample_data(PS.fin)$read_depth)
 min(sample_data(PS.fin)$read_depth)
 max(sample_data(PS.fin)$read_depth)
@@ -150,136 +151,6 @@ max(sample_data(PS.fin)$read_depth)
 #colnames(sample_sum_df) <- "read.sum"
 #sample_sum_df$sequence_ID <- rownames(sample_sum_df)
 
-
-```
-
-
-
-```{r Hellinger transformation (instead of rarefy)}
-# Hellinger (square root) transform the data!
-PS.hell = transform_sample_counts(PS.fin, function(x) x^0.5)
-
-set.seed(10000)
-# Bray Curtis dissimilarity matrix
-bc.hell <- phyloseq::distance(PS.hell, method = "bray")
-
-# making NMDS ordination
-set.seed(10000)
-nmds.hell <- metaMDS(bc.hell,
-          distance = "bray",
-          k = 3,
-          maxit = 999, 
-          wascores = TRUE)
-stress_result <- nmds.hell$stress
-species.scores.hell <- as.data.frame(scores(nmds.hell))
-nmds.merge.hell <- merge(sample_data(PS.hell), species.scores.hell, by = 'row.names', all = TRUE)
-
-
-# estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
-set.seed(10000)
-hell.model <- adonis2(bc.hell ~ lake*time_point*phy_group, data = nmds.merge.hell, permutations = 1000)
-hell.model
-
-
-set.seed(10000)
-hell.model.env <- adonis2(bc.hell ~ temp_C, data = nmds.merge.hell, permutations = 1000)
-hell.model.env
-
-adonis2(bc.hell ~ temp_C + pH + DO_perc + chla_ug.L + latitude + longitude + DOC + cond, data = nmds.merge.hell, permutations = 1000)
-
-install.packages('devtools')
-library(devtools)
-install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis") 
-library(pairwiseAdonis)
-
-# post hoc pairwise comparison to see what's driving the significance:
-pairwise.adonis2(bc.hell ~ time_point*phy_group, data = nmds.merge.hell)
-set.seed(10000)
-pairwise.adonis2(bc.hell ~ phy_group, data = nmds.merge.hell)
-pairwise.adonis2(bc.hell ~ lake, data = nmds.merge.hell)
-
-# beta dispersion test
-permutest(betadisper(bc.hell, nmds.merge.hell$lake), pairwise = T)
-permutest(betadisper(bc.hell, nmds.merge.hell$phy_group), pairwise = T)
-permutest(betadisper(bc.hell, nmds.merge.hell$temp_C), pairwise = T)
-permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
-# time is significant in the betadisper, sample_type and phy_group are not
-
-#testing this anosim function out since time did not pass homogeneity test
-#anosim(bc.hell, nmds.merge.hell$time_point, permutations = 1000)
-
-```
-
-
-```{r testing differences between zoops and water}
-PS.fin.zoops <- subset_samples(PS.fin, sample_type == "Zooplankton")
-PS.hell.zoops = transform_sample_counts(PS.fin.zoops, function(x) x^0.5)
-
-bc.hell.zoops <- phyloseq::distance(PS.hell.zoops, method = "bray")
-
-set.seed(10000)
-nmds.hell.zoops <- metaMDS(bc.hell.zoops,
-          distance = "bray",
-          k = 3,
-          maxit = 999, 
-          wascores = TRUE)
-stress_result.zoops <- nmds.hell.zoops$stress
-species.scores.hell.zoops <- as.data.frame(scores(nmds.hell.zoops))
-nmds.merge.hell.zoops <- merge(sample_data(PS.hell.zoops), species.scores.hell.zoops, by = 'row.names', all = TRUE)
-
-
-# estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
-set.seed(10000)
-hell.model.zoops <- adonis2(bc.hell.zoops ~ lake*time_point, data = nmds.merge.hell.zoops, permutations = 1000)
-hell.model.zoops
-
-
-set.seed(10000)
-hell.model.env.zoops <- adonis2(bc.hell.zoops ~ temp_C, data = nmds.merge.hell.zoops, permutations = 1000)
-hell.model.env.zoops
-
-#######
-
-PS.fin.water <- subset_samples(PS.fin, sample_type == "Water")
-PS.hell.water = transform_sample_counts(PS.fin.water, function(x) x^0.5)
-
-bc.hell.water <- phyloseq::distance(PS.hell.water, method = "bray")
-
-set.seed(10000)
-nmds.hell.water <- metaMDS(bc.hell.water,
-          distance = "bray",
-          k = 3,
-          maxit = 999, 
-          wascores = TRUE)
-stress_result.water <- nmds.hell.water$stress
-species.scores.hell.water <- as.data.frame(scores(nmds.hell.water))
-nmds.merge.hell.water <- merge(sample_data(PS.hell.water), species.scores.hell.water, by = 'row.names', all = TRUE)
-
-
-# estimate the actual statistical significance of differences in the observed community composition between two groups of samples.
-set.seed(10000)
-hell.model.water <- adonis2(bc.hell.water ~ time_point, data = nmds.merge.hell.water, permutations = 1000)
-hell.model.water
-
-
-set.seed(10000)
-hell.model.env.water <- adonis2(bc.hell.water ~ temp_C, data = nmds.merge.hell.water, permutations = 1000)
-hell.model.env.water
-
-
-```
-
-
-```{r top average taxa compositions}
-
-# finding average abundance of each class of bacteria for samples overall
-#glom <- tax_glom(PS.fin, taxrank = 'Class')
-#C.abund <- transform_sample_counts(glom, function(x) x / sum(x))
-#C.abund <- psmelt(C.abund)
-#avg.abund <- summaryBy(Abundance ~ Class, data = C.abund, FUN = mean)
-#avg.abund.sam <- summaryBy(Abundance ~ Class*sample_type, data = C.abund, FUN = mean)
-
-a <- summaryBy(rel_abund ~ Class*sample_type, data = Abund.final, FUN = mean)
 
 ```
 
@@ -362,422 +233,14 @@ plot_ordination(PS.rare, ord, color = "time_point") +
 ```
 
 
-```{r rarefy}
-
-table(sample_data(PS.fin)$sample_type)
-
-# rarefying to 500 reads (both the zoops and water)
-set.seed(10000)
-PS.500 <- rarefy_even_depth(PS.fin, rngseed=1e4, sample.size = 500)
-sort(rowSums(otu_table(t(PS.500))))
-
-# filtering metadata by sample names with 500 reads or more, 49 samples lost
-metadata_500 <- as.data.frame(sample_data(PS.500))
-metadata_500$sequence_ID <- rownames(PS.500) 
-table(sample_data(PS.500)$sample_type)
-
-# rarefying to 500 reads for just zoops
-set.seed(10000)
-PS.zoops <- rarefy_even_depth(PS.zoops, rngseed=1e4, sample.size = 500)
-table(sample_data(PS.zoops)$phy_group, sample_data(PS.zoops)$time_point, sample_data(PS.zoops)$lake)
-table(sample_data(PS.zoops)$sample_type)
-
-
-```
-
-
-```{r alpha diversity plots - plot_richness}
-
-water <- sample_data(PS.fin)[sample_data(PS.fin)$sample_type == "Water"]
-#richness by organism (or sample type i.e, water)
-richness.plot.organism <- plot_richness(PS.fin, x="sample_type", measures=c("Observed", "Shannon")) + 
-  labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
-  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
-richness.plot.organism
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=5, width=7)
-dev.off() 
-
-
-#richness by phy_group (or sample type i.e, water)
-richness.plot.phy <- plot_richness(PS.fin, x="phy_group", measures=c("Observed", "Shannon")) +
-  labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
-  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
-richness.plot.phy
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.phy.pdf", height=5, width=7)
-dev.off() 
-
-#richness by Time.point
-richness.plot.time.point <- plot_richness(PS.fin, x="time_point", measures=c("Observed")) + 
-  labs(y= "ASV Richness", x = "Sampling Time Point") + theme_bw() + geom_boxplot() +
-  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=16)) +
-  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=16)) +
-  theme(strip.text.x = element_text(size = 20))
-richness.plot.time.point
-dev.copy(pdf, "phyloseq analysis/figures/richness.plot.time.point.pdf", height=5, width=7)
-dev.off() 
-
-
-#richness by Lake
-diversity.plot.location <- plot_richness(PS.fin, x="lake", measures=c("Shannon")) +
-  labs(y= "Shannon Diversity", x = "Lake") + theme_bw() + geom_boxplot() + 
-  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=16)) +
-  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=16)) +
-  theme(strip.text.x = element_text(size = 20)) + ylim(0,6) + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + facet_grid(scale="free_x")
-diversity.plot.location
-dev.copy(pdf, "phyloseq analysis/figures/diversity.plot.location.pdf", height=5, width=7)
-dev.off()
-
-
-a.div.plots <- ggarrange(richness.plot.location + theme(axis.title.y=element_text(size=8)),
-                          richness.plot.time.point + theme(axis.title.y=element_text(size=8)),
-                           labels = c("A", "B"))
-a.div.plots
-dev.copy(pdf, "phyloseq analysis/figures/a.div.plots.pdf", height=10, width=20)
-dev.off()
-
-```
-
-
-```{r Env. effects and averages of ASV Richness and Diversity}
-
-######### zoops AND water
-# measure richness and shannon diversity
-
-a.diversity <- estimate_richness(PS.fin)
-row.names(a.diversity) <- row.names(sample_data(PS.fin))
-a.diversity <- cbind(a.diversity, sample_data(PS.fin)[,c(3,4,6,8,9:18,21:23)])
-view(a.diversity)
-
-zoops <- sample_data(PS.fin)[sample_data(PS.fin)$sample_type == "Zooplankton"]
-view(zoops)
-
-
-
-# make some ggplots using this data
-s.div.lake <- ggplot(a.diversity, aes(x = lake, y = Shannon)) +
-  geom_boxplot(lwd = 1,outlier.shape = NA) +  geom_point() + 
-  scale_size(guide='none') + theme_bw() + ylim(0,5.25) +
-  labs(y= "Shannon Diversity", x = "Lake") +
-  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=20)) +
-  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=20)) +
-  theme(strip.text.x = element_text(size = 20))
-s.div.lake <- s.div.lake + scale_color_manual(values=c("#56B4E9", "red3"),
-                       name="Sample Type",
-                       breaks=c("Water", "Zooplankton")) +
-  scale_fill_manual(values=c("#56B4E9", "red3"),
-                    name="Sample Type",
-                       breaks=c("Water", "Zooplankton")) +
-  theme(legend.text = element_text(size = 16), 
-                                  legend.title = element_text(size = 20, face = "bold"), 
-                                  legend.key.size = unit(2, 'cm'))
-s.div.lake
-dev.copy(pdf, "phyloseq analysis/figures/s.div.lake.pdf", height=10, width=20)
-dev.off()
-
-richness.time <- ggplot(a.diversity, aes(x = time_point, y = Observed, color = sample_type)) +
-  geom_boxplot(lwd = 1,outlier.shape = NA) +  geom_point(aes(fill = sample_type), position = position_jitterdodge(),size = 2, pch = 21) +
-  scale_size(guide='none') + theme_bw() + labs(y= "ASV Richness", x = "Sampling Time Point") +
-  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=20)) +
-  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=20)) +
-  theme(strip.text.x = element_text(size = 20)) + 
-  scale_color_manual(values=c("#56B4E9", "red3"),
-                       name="Sample Type",
-                       breaks=c("Water", "Zooplankton")) +
-  scale_fill_manual(values=c("#56B4E9", "red3"),
-                       name="Sample Type",
-                       breaks=c("Water", "Zooplankton")) +
-  theme(legend.position="none")
-
-combined_divplot_legend <- ggarrange(s.div.lake, richness.time, labels = c("A", "B"), common.legend = TRUE, legend="bottom")
-combined_divplot_legend
-dev.copy(pdf, "phyloseq analysis/figures/combined_divplot_legend.pdf", height=10, width=20)
-dev.off()
-
-# bell curve/ normally distributed, so we can use anova
-hist(a.diversity$Shannon, main="Shannon diversity", xlab="", breaks=10)
-shapiro.test(a.diversity$Shannon)
-
-# Testing effects on Shannon diversity index
-Anova(lm(Shannon ~ lake, data = a.diversity))
-shan.anova <- aov(lm(Shannon ~ lake, data = a.diversity))
-tukey <- TukeyHSD(shan.anova) 
-cld <- multcompLetters4(shan.anova, tukey)
-
-
-# testing effects of environmental variables on Shannon diversity
-a.div.mod <- lm(Shannon ~ temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond, data = a.diversity)
-a.div.AIC <- MASS::stepAIC(a.div.mod, direction = "both")
-summary(lm(Shannon ~ elevation_m + DO_perc + cond, data = a.diversity))
-microbe_div_phyto <- ggplot(a.diversity, aes(x=cond, y=Shannon)) +
-    geom_point() +
-    geom_smooth(method=lm)
-microbe_div_phyto
-dev.print(pdf, "phyloseq analysis/figures/microbe_div_phyto.pdf", height=10, width=15)
-dev.off
-ggscatter(a.diversity, x = "cond", y = "Shannon",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson", cor.coef.coord = c(0.65,2.98),
-          xlab = "Temperature", ylab = "Zooplankton Community Shannon Diversity")
-
-
-# summaryBy for averages and lm for regression model to conduct anova for significance
-lake_div <- summaryBy(Shannon ~ lake, data = a.diversity, FUN = c(median, mean, se))
-
-
-# plots
-
-bargraph.CI(lake, Shannon, data = a.diversity,
-                     xlab = "Sample Type", ylab = "Shannon Diversity", cex.lab = 1.5, x.leg = 2,
-                     col = "black", angle = 45, cex.names = 1.25,
-                     density = c(0,20), legend = TRUE)
-
-
-
-rare.a.div.thru.time <- ggplot(rare.sum_div, aes(x=lake, y=shannon.mean)) + geom_boxplot()
-  ylim(1,5) +
-  geom_point(size = 1.2) +
-  xlab('Sampling Time Point') +
-  ylab('Average Shannon Diversity') +
-  geom_errorbar(aes(ymin=shannon.mean - shannon.sd, ymax=shannon.mean + shannon.sd), width=.05,
-                 position=position_dodge(0.05)) +
-  theme(strip.text.y = element_text(size = 8, hjust = 0.5,
-          vjust = 0.5, face = 'bold'))
-rare.a.div.thru.time
-dev.copy(pdf, "phyloseq analysis/figures/rare.a.div.thru.time.pdf", height=6, width=8)
-dev.off() 
-
-rare.rich.thru.time <- ggplot(sum_rich, aes(x=lake, y=observed.mean))+
-  ylim(10,150) +
-  geom_point(size = 1.2) +
-  geom_line(size = 0.3) +
-  xlab('Sampling Time Point') +
-  ylab('Average Richness') +
-  geom_errorbar(aes(ymin=observed.mean - observed.sd, ymax=observed.mean + observed.sd), width=.05,
-                 position=position_dodge(0.05)) +
-  theme(strip.text.y = element_text(size = 8, hjust = 0.5,
-          vjust = 0.5, face = 'bold')) +
-  stat_compare_means(method = "anova")
-rare.rich.thru.time
-dev.copy(pdf, "phyloseq analysis/figures/rare.rich.thru.time.pdf", height=6, width=8)
-dev.off() 
-
-```
-
-
-```{r testing effects of env. variables on rel. abund. and richness of dominant bacteria}
-# Extract the abundance matrix
-abundance_matrix <- as.data.frame(otu_table(PS.hell))
-
-# Extract the metadata
-metaD <- as.data.frame(sample_data(PS.hell))
-
-# Extract the taxa table
-taxa_table <- as.data.frame(tax_table(PS.hell))
-
-# Subset the abundance matrix to include only the class of interest
-class_abundance <- abundance_matrix[taxa_table$Class == "Alphaproteobacteria",]
-alphaproteobacteria <- subset(taxa_table, Class == "Alphaproteobacteria")
-merged_data <- merge(alphaproteobacteria, t(abundance_matrix), metaD, by = "row.names")
-
-
-Bacteroidia <- subset(Abund.final, Class == "Bacteroidia")
-Bacteroidia <- summaryBy(rel_abund ~ sequence_ID, data = Bacteroidia, FUN = sum)
-Bacteroidia <- data.frame(Bacteroidia, row.names = Bacteroidia[,1])
-Bacteroidia <- merge(Bacteroidia, sample_data(PS.fin), by = "row.names")
-view(Bacteroidia)
-Anova(lm(rel_abund.sum ~ phy_group*time_point*lake, data = Bacteroidia)) # none
-
-TukeyHSD(aov(lm(rel_abund.sum ~ phy_group, data = Bacteroidia)))
-FitAll.bacter <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = Bacteroidia)
-step(FitAll.bacter, direction = "both") # nothing significant
-
-gammaproteobacteria <- subset(Abund.final, Class == "Gammaproteobacteria")
-gammaproteobacteria <- summaryBy(rel_abund ~ sequence_ID, data = gammaproteobacteria, FUN = sum)
-gammaproteobacteria <- data.frame(gammaproteobacteria, row.names = gammaproteobacteria[,1])
-gammaproteobacteria <- merge(gammaproteobacteria, sample_data(PS.fin), by = "row.names")
-Anova(lm(rel_abund.sum ~ time_point + phy_group, data = gammaproteobacteria)) # time and phy
-
-FitAll.gamma <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = gammaproteobacteria)
-step(FitAll.gamma, direction = "both")
-summary(lm(rel_abund.sum ~ DOC + elevation_m + cond + chla_ug.L, data = gammaproteobacteria)) # chlorophyll is significant but relies on other variables
-gamma_chla <- ggplot(gammaproteobacteria, aes(x=chla_ug.L, y=rel_abund.sum)) +
-  geom_point() +
-  geom_smooth() + xlab("Chlorophyll a (ug/L)") + ylab("Gammaproteobacteria Abundance") +
-  theme(axis.text.x=element_text(size=14)) + theme(axis.title.x=element_text(size=16)) +
-  theme(axis.text.y=element_text(size=14)) + theme(axis.title.y=element_text(size=16))
-gamma_chla
-dev.copy(pdf, "phyloseq analysis/figures/gamma_chla.pdf", height=6, width=10)
-dev.off()
-
-gamma_chla <- ggscatter(gammaproteobacteria, x = "chla_ug.L", y = "rel_abund.sum",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.coeff.args = list( method = "pearson"),cor.coef.coord = c(0.0,0.98),
-          xlab = ("Chlorophyll a (ug/L)"), ylab = ("Gammaproteobacteria Abundance"))
-gamma_chla 
-dev.copy(pdf, "phyloseq analysis/figures/gamma_chla.pdf", height=6, width=10)
-dev.off()
-
-alphaproteobacteria <- subset(Abund.final, Class == "Alphaproteobacteria")
-alphaproteobacteria <- summaryBy(rel_abund ~ sequence_ID, data = alphaproteobacteria, FUN = sum)
-alphaproteobacteria <- data.frame(alphaproteobacteria, row.names = alphaproteobacteria[,1])
-alphaproteobacteria <- merge(alphaproteobacteria, sample_data(PS.fin), by = "row.names")
-Anova(lm(rel_abund.sum ~ lake + time_point + phy_group, data = alphaproteobacteria)) #none
-TukeyHSD(aov(lm(rel_abund.sum ~ lake + time_point + phy_group, data = alphaproteobacteria)))
-FitAll.alpha <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = alphaproteobacteria)
-step(FitAll.alpha, direction = "both") # chla
-summary(lm(rel_abund.sum ~ chla_ug.L, data = alphaproteobacteria)) #nah
-
-actinobacteria <- subset(Abund.final, Class == "Actinobacteria")
-actinobacteria <- summaryBy(rel_abund ~ sequence_ID, data = actinobacteria, FUN = sum)
-actinobacteria <- data.frame(actinobacteria, row.names = actinobacteria[,1])
-actinobacteria <- merge(actinobacteria, sample_data(PS.fin), by = "row.names")
-Anova(lm(rel_abund.sum ~ lake*time_point*phy_group, data = actinobacteria)) #none
-act.aov <- aov(lm(rel_abund.sum ~ lake + time_point + phy_group, data = actinobacteria))
-TukeyHSD(act.aov)
-FitAll.actino <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = actinobacteria)
-step(FitAll.actino, direction = "both") # DO
-summary(lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + cond + 
-    chla_ug.L, data = actinobacteria)) # DO, pH, cond
-
-actino_DO <- ggplot(actinobacteria, aes(x=DO_perc, y=rel_abund.sum)) +
-  geom_point() +
-  geom_smooth() + xlab("Dissolved Oxygen (%)") + ylab("Actinobacteria Abundance") +
-  theme(axis.text.x=element_text(size=14)) + theme(axis.title.x=element_text(size=16)) +
-  theme(axis.text.y=element_text(size=14)) + theme(axis.title.y=element_text(size=16))
-actino_DO 
-dev.copy(pdf, "phyloseq analysis/figures/actino_DO.pdf", height=6, width=10)
-dev.off()
-
-actino_DO <- ggscatter(actinobacteria, x = "DO_perc", y = "rel_abund.sum",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.coeff.args = list( method = "pearson"), cor.coef.coord = c(65,0.45),
-          xlab = ("Dissolved Oxygen (%)"), ylab = ("Actinobacteria Abundance"))
-actino_DO 
-dev.copy(pdf, "phyloseq analysis/figures/actino_DO.pdf", height=6, width=10)
-dev.off()
-
-
-cyanobacteriia <- subset(Abund.final, Class == "Cyanobacteriia")
-cyanobacteriia <- summaryBy(rel_abund ~ sequence_ID, data = cyanobacteriia, FUN = sum)
-cyanobacteriia <- data.frame(cyanobacteriia, row.names = cyanobacteriia[,1])
-cyanobacteriia <- merge(cyanobacteriia, sample_data(PS.fin), by = "row.names")
-Anova(lm(rel_abund.sum ~ lake + time_point + phy_group, data = cyanobacteriia)) # none
-FitAll.cyano <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = cyanobacteriia)
-stepAIC(FitAll.cyano, direction = "both") # none
-
-
-```
-
-
-```{r correlations}
-
-cor.test(sample_data(PS.hell)$latitude, sample_data(PS.hell)$chla_ug.L)
-
-ggscatter(sample_data(PS.hell), x = "elevation_m", y = "DOC",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "elevation (m)", ylab = "DOC")
-
-ggscatter(sample_data(PS.hell), x = "temp_C", y = "DOC",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "temperature", ylab = "DOC")
-
-#significant
-ggscatter(sample_data(PS.hell), x = "elevation_m", y = "chla_ug.L", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "elevation (m)", ylab = "chla")
-
-# significant
-ggscatter(sample_data(PS.hell), x = "elevation_m", y = "temp_C", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "elevation (m)", ylab = "Temperature (C)")
-
-# significant
-ggscatter(sample_data(PS.hell), x = "latitude", y = "temp_C",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "Temperature")
-
-# significant
-ggscatter(sample_data(PS.hell), x = "latitude", y = "DOC", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "DOC")
-
-#significant
-ggscatter(sample_data(PS.hell), x = "latitude", y = "chla_ug.L", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "chla")
-
-ggscatter(sample_data(PS.hell), x = "DOC", y = "chla_ug.L", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "DOC", ylab = "chla")
-
-#significant
-ggscatter(sample_data(PS.hell), x = "temp_C", y = "pH", color = "lake",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "temp_C", ylab = "pH")
-
-ggscatter(sample_data(PS.hell), x = "latitude", y = "DO_perc",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "DO")
-
-ggscatter(sample_data(PS.hell), x = "latitude", y = "chla_ug.L",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "Chl a")
-
-ggscatter(sample_data(PS.hell), x = "latitude", y = "cond",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "Conductivity")
-
-ggscatter(sample_data(PS.hell), x = "latitude", y = "pH",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "latitude", ylab = "pH")
-```
-
-
-```{r environmental effects on bacterial comm. dissimilarities}
-
-colSums(is.na(metadata))
-# As stated early in the article, PCA only works with numerical values
-numerical_data <- metadata[,10:19]
-data_normalized <- scale(numerical_data)
-head(data_normalized)
-corr_matrix <- cor(data_normalized)
-ggcorrplot(corr_matrix)
-data.pca <- princomp(corr_matrix)
-summary(data.pca)
-fviz_eig(data.pca, addlabels = TRUE)
-fviz_pca_var(data.pca, col.var = "black")
-
-```
-
-
 ```{r Bray curtis distance matrix}
 
 raw.asv.table <- as.data.frame(t(otu_table(PS.fin)))
 str(raw.asv.table)
 str(ASV_table)
 
-# 3 methods for calculating bray curtis dissimilarity
 
-set.seed(10000)
-avg_bray_500 <- avgdist(raw.asv.table, sample = 500)
-
-set.seed(10000)
-bc_vegdist <- vegdist(t(otu_table(PS.fin)), method = "bray")
-
-# will use these moving forward:
+# calculating bray curtis distances
 set.seed(10000)
 bc <- phyloseq::distance(PS.fin, method = "bray")
 set.seed(10000)
@@ -876,28 +339,256 @@ anova(betadisper(bc_water, nmds.merge4$time_point))
 ```
 
 
-```{r combining NMDS and PCA}
-#Take environmental data, run PCA to compress to a single variable (PC1), and examine
-#relationship between PC1 and NMDS1, as a way to examine beta diversity x environment. 
-#Output here are testing NMDS relationship against PC1 and habitat using linear models.
+```{r rarefy}
 
-numerical_data <- as.matrix(sample_data(PS.hell)[,c(12:19)])
-env.PCA <- prcomp(numerical_data, center = TRUE, scale= TRUE)
-summary(env.PCA)
-pc_scores <- scores(env.PCA)
-pc_scores <- as.data.frame(pc_scores)
-pc_loadings <- env.PCA$rotation
-NMDSxPCA_data <- data.frame(NMDS1 = species.scores.hell$NMDS1, PC1 = pc_scores[, 1], time = sample_data(PS.hell)$time_point, lake = sample_data(PS.hell)$lake)
-nmdsXpca <- ggplot(NMDSxPCA_data, aes(x = PC1, y = NMDS1, color = lake)) +
-  geom_point() + stat_ellipse() +
-  #geom_smooth(aes(color=lake, fill=lake), method = "lm", alpha = .2) +
-  xlab("PC1 (Environment)") + ylab("NMDS1 (Bray-Curtis)") +
-  theme_bw()
-nmdsXpca 
-dev.copy(pdf, "phyloseq analysis/figures/nmdsXpca .pdf", height=4, width=10)
+table(sample_data(PS.fin)$sample_type)
+
+# rarefying to 500 reads (both the zoops and water)
+set.seed(10000)
+PS.500 <- rarefy_even_depth(PS.fin, rngseed=1e4, sample.size = 500)
+sort(rowSums(otu_table(t(PS.500))))
+
+# filtering metadata by sample names with 500 reads or more, 49 samples lost
+metadata_500 <- as.data.frame(sample_data(PS.500))
+metadata_500$sequence_ID <- rownames(PS.500) 
+table(sample_data(PS.500)$sample_type)
+
+# rarefying to 500 reads for just zoops
+set.seed(10000)
+PS.zoops <- rarefy_even_depth(PS.zoops, rngseed=1e4, sample.size = 500)
+table(sample_data(PS.zoops)$phy_group, sample_data(PS.zoops)$time_point, sample_data(PS.zoops)$lake)
+table(sample_data(PS.zoops)$sample_type)
+
+
+```
+
+
+```{r Hellinger transformation --> THIS IS WHAT I WILL USE FOR ANALYSIS}
+# Hellinger (square root) transform the data!
+PS.hell = transform_sample_counts(PS.fin, function(x) x^0.5)
+
+set.seed(10000)
+# Bray Curtis dissimilarity matrix
+bc.hell <- phyloseq::distance(PS.hell, method = "bray")
+
+# making NMDS ordination
+set.seed(10000)
+nmds.hell <- metaMDS(bc.hell,
+          distance = "bray",
+          k = 3,
+          maxit = 999, 
+          wascores = TRUE)
+stress_result <- nmds.hell$stress
+species.scores.hell <- as.data.frame(scores(nmds.hell))
+nmds.merge.hell <- merge(sample_data(PS.hell), species.scores.hell, by = 'row.names', all = TRUE)
+
+
+# test the effects of lake, time, and sample type (water, Cladocera, Copepoda) on the BC dissimilarities of the microbial communities
+set.seed(10000)
+hell.model <- adonis2(bc.hell ~ lake*time_point + phy_group, data = nmds.merge.hell, permutations = 1000)
+hell.model
+
+# test the effects of spatial and environmental variables on the BC dissimilarities of the microbial communities
+adonis2(bc.hell ~ temp_C + pH + DO_perc + chla_ug.L + latitude + longitude + DOC + cond + elevation_m, data = nmds.merge.hell, permutations = 1000)
+set.seed(10000)
+hell.model.env <- adonis2(bc.hell ~ temp_C, data = nmds.merge.hell, permutations = 1000)
+hell.model.env
+
+
+install.packages('devtools')
+library(devtools)
+install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis") 
+library(pairwiseAdonis)
+
+# post hoc pairwise comparison to see what's driving the significance:
+pairwise.adonis2(bc.hell ~ time_point*phy_group, data = nmds.merge.hell)
+set.seed(10000)
+pairwise.adonis2(bc.hell ~ phy_group, data = nmds.merge.hell)
+pairwise.adonis2(bc.hell ~ lake, data = nmds.merge.hell)
+
+# beta dispersion test
+permutest(betadisper(bc.hell, nmds.merge.hell$lake), pairwise = T)
+permutest(betadisper(bc.hell, nmds.merge.hell$phy_group), pairwise = T)
+permutest(betadisper(bc.hell, nmds.merge.hell$temp_C), pairwise = T)
+permutest(betadisper(bc.hell, nmds.merge.hell$time_point), pairwise = T)
+# time is significant in the betadisper, sample_type and phy_group are not
+
+#testing this anosim function out since time did not pass homogeneity test
+#anosim(bc.hell, nmds.merge.hell$time_point, permutations = 1000)
+
+```
+
+
+```{r top average taxa compositions for each sample type}
+
+dominant_taxa <- summaryBy(rel_abund ~ Class*sample_type, data = Abund.final, FUN = mean)
+
+```
+
+
+```{r alpha diversity plots - plot_richness}
+
+#richness by organism (or sample type i.e, water)
+richness.plot.organism <- plot_richness(PS.fin, x="sample_type", measures=c("Observed", "Shannon")) + 
+  labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
+  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
+richness.plot.organism
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.organism.pdf", height=5, width=7)
 dev.off() 
 
-anova(lm(NMDS1 ~ PC1*lake, data = NMDSxPCA_data))
+
+#richness by phy_group (or sample type i.e, water)
+richness.plot.phy <- plot_richness(PS.fin, x="phy_group", measures=c("Observed", "Shannon")) +
+  labs(y= "Alpha Diversity Measure", x = "Sample Type") + theme_bw() + geom_boxplot() +
+  theme(axis.text.x=element_text(size=9)) + theme(strip.text.x = element_text(size = 12))
+richness.plot.phy
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.phy.pdf", height=5, width=7)
+dev.off() 
+
+#richness by Time.point
+richness.plot.time.point <- plot_richness(PS.fin, x="time_point", measures=c("Observed")) + 
+  labs(y= "ASV Richness", x = "Sampling Time Point") + theme_bw() + geom_boxplot() +
+  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=16)) +
+  theme(strip.text.x = element_text(size = 20))
+richness.plot.time.point
+dev.copy(pdf, "phyloseq analysis/figures/richness.plot.time.point.pdf", height=5, width=7)
+dev.off() 
+
+
+#Shannon diversity by Lake
+diversity.plot.location <- plot_richness(PS.fin, x="lake", measures=c("Shannon")) +
+  labs(y= "Shannon Diversity", x = "Lake") + theme_bw() + geom_boxplot() + 
+  theme(axis.text.x=element_text(size=16)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=16)) + theme(axis.title.y=element_text(size=16)) +
+  theme(strip.text.x = element_text(size = 20)) + ylim(0,6) + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + facet_grid(scale="free_x")
+diversity.plot.location
+dev.copy(pdf, "phyloseq analysis/figures/diversity.plot.location.pdf", height=5, width=7)
+dev.off()
+
+
+```
+
+
+```{r Env. effects and averages of ASV Richness and Diversity}
+
+######### zoops AND water
+# measure richness and shannon diversity
+a.diversity <- estimate_richness(PS.fin)
+row.names(a.diversity) <- row.names(sample_data(PS.fin))
+a.diversity <- cbind(a.diversity, sample_data(PS.fin)[,c(3,4,6,8,9:18,21:23)])
+view(a.diversity)
+
+
+# bell curve/ normally distributed, so we can use anova
+hist(a.diversity$Shannon, main="Shannon diversity", xlab="", breaks=10)
+shapiro.test(a.diversity$Shannon)
+
+# Testing effects on Shannon diversity index
+Anova(lm(Shannon ~ lake, data = a.diversity))
+shan.anova <- aov(lm(Shannon ~ lake, data = a.diversity))
+tukey <- TukeyHSD(shan.anova) 
+cld <- multcompLetters4(shan.anova, tukey)
+
+
+# testing effects of environmental variables on Shannon diversity
+a.div.mod <- lm(Shannon ~ temp_C + DOC + elevation_m + chla_ug.L + pH + DO_perc + cond, data = a.diversity)
+a.div.AIC <- MASS::stepAIC(a.div.mod, direction = "both")
+summary(lm(Shannon ~ elevation_m + DO_perc + cond, data = a.diversity))
+
+ggscatter(a.diversity, x = "cond", y = "Shannon",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson", cor.coef.coord = c(0.65,2.98),
+          xlab = "Temperature", ylab = "Zooplankton Community Shannon Diversity")
+
+
+# summaryBy for median, mean, and standard error of the Shannon diversity by lake
+lake_div <- summaryBy(Shannon ~ lake, data = a.diversity, FUN = c(median, mean, se))
+
+
+# plot Shannon diversity average across lakes
+bargraph.CI(lake, Shannon, data = a.diversity,
+                     xlab = "Sample Type", ylab = "Shannon Diversity", cex.lab = 1.5, x.leg = 2,
+                     col = "black", angle = 45, cex.names = 1.25,
+                     density = c(0,20), legend = TRUE)
+
+```
+
+
+```{r environmental correlations}
+
+cor.test(sample_data(PS.hell)$latitude, sample_data(PS.hell)$chla_ug.L)
+
+ggscatter(sample_data(PS.hell), x = "elevation_m", y = "DOC",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "elevation (m)", ylab = "DOC")
+
+ggscatter(sample_data(PS.hell), x = "temp_C", y = "DOC",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "temperature", ylab = "DOC")
+
+#significant
+ggscatter(sample_data(PS.hell), x = "elevation_m", y = "chla_ug.L", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "elevation (m)", ylab = "chla")
+
+# significant
+ggscatter(sample_data(PS.hell), x = "elevation_m", y = "temp_C", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "elevation (m)", ylab = "Temperature (C)")
+
+# significant
+ggscatter(sample_data(PS.hell), x = "latitude", y = "temp_C",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "Temperature")
+
+# significant
+ggscatter(sample_data(PS.hell), x = "latitude", y = "DOC", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "DOC")
+
+#significant
+ggscatter(sample_data(PS.hell), x = "latitude", y = "chla_ug.L", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "chla")
+
+ggscatter(sample_data(PS.hell), x = "DOC", y = "chla_ug.L", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "DOC", ylab = "chla")
+
+#significant
+ggscatter(sample_data(PS.hell), x = "temp_C", y = "pH", color = "lake",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "temp_C", ylab = "pH")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "DO_perc",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "DO")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "chla_ug.L",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "Chl a")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "cond",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "Conductivity")
+
+ggscatter(sample_data(PS.hell), x = "latitude", y = "pH",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "latitude", ylab = "pH")
 ```
 
 
@@ -909,9 +600,7 @@ env.hell <- sample_data(PS.hell)[ ,c(6,9:18)]
 # run the envfit function
 fit.env.hell <- envfit(nmds.hell, env.hell, na.rm = T)
 
-
 # colors and groups for plots
-
 time_colors <- c("blue","red", "purple2", "turquoise", "orange2")
 time.group <- nmds.merge.hell$time_point
 
@@ -1107,6 +796,27 @@ map
 ```
 
 
+```{r plotting lake elevations to visualize spatial differences}
+
+elevations <- sample_data(PS.fin) %>%
+  arrange(elevation_m) %>%
+  mutate(lake = factor(lake, levels=c("Eastern Brook", "Serene", "Convict", "Virginia", "Blue", "Cooney"))) %>%
+  ggplot(aes(x=lake, y=elevation_m, color = lake)) +
+  geom_point(aes(size = 1.3)) +
+  theme_classic() +
+  xlab("Lake") +
+  ylab("Elevation (m)") +
+  ylim(0,3500) +
+  theme(axis.text.x=element_text(size=20)) + theme(axis.title.x=element_text(size=20)) + 
+  theme(axis.text.y=element_text(size=20)) + theme(axis.title.y=element_text(size=20)) +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
+  scale_color_manual(values = c("orange2", "violet", "darkorchid4", "darkgreen", "royalblue", "chartreuse2"))
+elevations
+dev.copy(pdf, "phyloseq analysis/figures/elevations.pdf", height=5, width=5)
+dev.off()
+```
+
+
 ```{r mantel test, geographic distance}
 # to calculate geographic distances between lakes
 # geographic distance dissim matrix - adapted from weinstein et al 
@@ -1149,7 +859,6 @@ std_dissimilarities <- decostand(norm_dissimilarities, method = "standardize")
 procrustes_results <- protest(std_distances, std_dissimilarities)
 # Extract transformed coordinates
 transformed_coordinates <- procrustes_results$points
-
 
 ```
 
@@ -1247,7 +956,98 @@ dev.off
 ```
 
 
-```{r NMDS plots broken down by lakes and times}
+```{r General NMDS (time, lake, basin, etc.)}
+
+nmds.time <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = time_point)) +
+  geom_point(aes(color = time_point), size = 3) + 
+  stat_ellipse(level=0.9, lwd = 1.2, linetype = 2, aes(color=time_point)) +
+  scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) + 
+  theme_bw() +
+  theme(axis.text.x=element_text(size=18)) + theme(axis.title.x=element_text(size=20)) +
+  theme(axis.text.y=element_text(size=18)) + theme(axis.title.y=element_text(size=20)) +
+  theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        legend.key.height = unit(1, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=20), #change legend title font size
+        legend.text = element_text(size=18)) #change legend text font size
+nmds.time
+dev.print(pdf, "phyloseq analysis/figures/nmds.time.pdf", height=10, width=15)
+dev.off
+
+nmds.lake <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = lake)) +
+  geom_point(aes(color = lake), size = 3) + 
+  stat_ellipse(level=0.9, lwd = 1, linetype = 2, aes(color=lake)) +
+  scale_color_manual(values = c("blue","chocolate1", "purple", "hotpink", "chartreuse3",  "gold2")) +
+  theme_bw() +
+    theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        legend.key.height = unit(1, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=20), #change legend title font size
+        legend.text = element_text(size=18)) #change legend text font size
+nmds.lake
+dev.print(pdf, "phyloseq analysis/figures/nmds.lake.pdf", height=10, width=15)
+dev.off
+
+nmds.basin <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = basin)) +
+  geom_point(aes(color = basin), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=basin)) +
+  theme_bw()
+nmds.basin
+dev.print(pdf, "phyloseq analysis/figures/nmds.basin.pdf", height=10, width=15)
+dev.off
+
+nmds.elevation <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = elev.cat)) +
+  geom_point(aes(color = elev.cat), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=elev.cat)) +
+  theme_bw()
+nmds.elevation
+dev.print(pdf, "phyloseq analysis/figures/nmds.elevation.pdf", height=10, width=15)
+dev.off
+  
+nmds.sample_type <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+  geom_point(aes(color = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
+  theme_bw()
+nmds.sample_type
+dev.print(pdf, "phyloseq analysis/figures/nmds.sample_type.pdf", height=10, width=15)
+dev.off
+
+nmds.phy_group <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = phy_group)) +
+  geom_point(aes(color = phy_group), size = 3) + 
+  stat_ellipse(level=0.9, lwd = 1, linetype = 2, aes(color=phy_group)) +
+  theme_bw() +
+  scale_color_manual(values = c("red3", "orange", "royalblue3")) + 
+  theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        legend.key.height = unit(1, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=20), #change legend title font size
+        legend.text = element_text(size=18)) #change legend text font size
+nmds.phy_group
+dev.print(pdf, "phyloseq analysis/figures/nmds.phy_group.pdf", height=10, width=15)
+dev.off
+
+phy_group_plots_combined <- ggarrange(nmds.phy_group, overall.comp.class, nrow=2, ncol=1, labels = c("A","B"))
+phy_group_plots_combined
+dev.print(pdf, "phyloseq analysis/figures/phy_group_plots_combined.pdf", height=10, width=10)
+dev.off
+
+nmds.phy_group <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = chla_ug.L)) +
+  geom_point(size = 3) + 
+  stat_ellipse(aes(color = chla_ug.L), level=0.9, lwd = 1, linetype = 2) +
+  theme_bw() +
+  theme(legend.key.size = unit(1, 'cm'), #change legend key size
+        legend.key.height = unit(1, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=20), #change legend title font size
+        legend.text = element_text(size=18)) #change legend text font size
+nmds.phy_group
+dev.print(pdf, "phyloseq analysis/figures/nmds.phy_group.pdf", height=10, width=15)
+dev.off
+
+```
+
+
+```{r NMDS plots broken down by each lake and time point}
 centroid <- nmds.merge2 %>% 
   group_by(time_point) %>%
   summarize(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
@@ -1416,110 +1216,12 @@ nmds.water.time <- ggplot(nmds.merge.hell[nmds.merge.hell$sample_type == "Water"
 nmds.water.time
 dev.print(pdf, "phyloseq analysis/figures/nmds.water.time.pdf", height=10, width=15)
 dev.off
-
-nmds.zoops.time.basin <- ggplot(nmds.merge3, aes(x=NMDS1, y=NMDS2, color = time_point)) +
-  geom_point(aes(color = basin)) +
-  stat_ellipse(level=0.9, linetype = 2) +
-  theme_bw() +
-  ggtitle("Zoops")
-nmds.zoops.time.basin
   
 
 ```
 
 
-```{r General NMDS}
-
-nmds.time <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = time_point)) +
-  geom_point(aes(color = time_point), size = 3) + 
-  stat_ellipse(level=0.9, lwd = 1.2, linetype = 2, aes(color=time_point)) +
-  scale_color_manual(values = c("blue","red", "purple2", "turquoise", "orange2")) + 
-  theme_bw() +
-  theme(axis.text.x=element_text(size=18)) + theme(axis.title.x=element_text(size=20)) +
-  theme(axis.text.y=element_text(size=18)) + theme(axis.title.y=element_text(size=20)) +
-  theme(legend.key.size = unit(1, 'cm'), #change legend key size
-        legend.key.height = unit(1, 'cm'), #change legend key height
-        legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=20), #change legend title font size
-        legend.text = element_text(size=18)) #change legend text font size
-nmds.time
-dev.print(pdf, "phyloseq analysis/figures/nmds.time.pdf", height=10, width=15)
-dev.off
-
-nmds.lake <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = lake)) +
-  geom_point(aes(color = lake), size = 3) + 
-  stat_ellipse(level=0.9, lwd = 1, linetype = 2, aes(color=lake)) +
-  scale_color_manual(values = c("blue","chocolate1", "purple", "hotpink", "chartreuse3",  "gold2")) +
-  theme_bw() +
-    theme(legend.key.size = unit(1, 'cm'), #change legend key size
-        legend.key.height = unit(1, 'cm'), #change legend key height
-        legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=20), #change legend title font size
-        legend.text = element_text(size=18)) #change legend text font size
-nmds.lake
-dev.print(pdf, "phyloseq analysis/figures/nmds.lake.pdf", height=10, width=15)
-dev.off
-
-nmds.basin <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = basin)) +
-  geom_point(aes(color = basin), size = 3) + 
-  stat_ellipse(level=0.9, linetype = 2, aes(color=basin)) +
-  theme_bw()
-nmds.basin
-dev.print(pdf, "phyloseq analysis/figures/nmds.basin.pdf", height=10, width=15)
-dev.off
-
-nmds.elevation <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = elev.cat)) +
-  geom_point(aes(color = elev.cat), size = 3) + 
-  stat_ellipse(level=0.9, linetype = 2, aes(color=elev.cat)) +
-  theme_bw()
-nmds.elevation
-dev.print(pdf, "phyloseq analysis/figures/nmds.elevation.pdf", height=10, width=15)
-dev.off
-  
-nmds.sample_type <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = phy_group)) +
-  geom_point(aes(color = phy_group), size = 3) + 
-  stat_ellipse(level=0.9, linetype = 2, aes(color=phy_group)) +
-  theme_bw()
-nmds.sample_type
-dev.print(pdf, "phyloseq analysis/figures/nmds.sample_type.pdf", height=10, width=15)
-dev.off
-
-nmds.phy_group <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = phy_group)) +
-  geom_point(aes(color = phy_group), size = 3) + 
-  stat_ellipse(level=0.9, lwd = 1, linetype = 2, aes(color=phy_group)) +
-  theme_bw() +
-  scale_color_manual(values = c("red3", "orange", "royalblue3")) + 
-  theme(legend.key.size = unit(1, 'cm'), #change legend key size
-        legend.key.height = unit(1, 'cm'), #change legend key height
-        legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=20), #change legend title font size
-        legend.text = element_text(size=18)) #change legend text font size
-nmds.phy_group
-dev.print(pdf, "phyloseq analysis/figures/nmds.phy_group.pdf", height=10, width=15)
-dev.off
-
-phy_group_plots_combined <- ggarrange(nmds.phy_group, overall.comp.class, nrow=2, ncol=1, labels = c("A","B"))
-phy_group_plots_combined
-dev.print(pdf, "phyloseq analysis/figures/phy_group_plots_combined.pdf", height=10, width=10)
-dev.off
-
-nmds.phy_group <- ggplot(nmds.merge.hell, aes(x=NMDS1, y=NMDS2, color = chla_ug.L)) +
-  geom_point(size = 3) + 
-  stat_ellipse(aes(color = chla_ug.L), level=0.9, lwd = 1, linetype = 2) +
-  theme_bw() +
-  theme(legend.key.size = unit(1, 'cm'), #change legend key size
-        legend.key.height = unit(1, 'cm'), #change legend key height
-        legend.key.width = unit(1, 'cm'), #change legend key width
-        legend.title = element_text(size=20), #change legend title font size
-        legend.text = element_text(size=18)) #change legend text font size
-nmds.phy_group
-dev.print(pdf, "phyloseq analysis/figures/nmds.phy_group.pdf", height=10, width=15)
-dev.off
-
-```
-
-
-```{r capscale and dbRDA}
+```{r capscale and dbRDA --> having a hard time figuring this out}
 # Trying to find environmental variables that signiificantly explained variation in the 
 # 16S community composition
 
@@ -1612,100 +1314,9 @@ plot(dbRDA)
 ```
 
 
-```{r bar plot for rare (<0.01 species)}
-
-ASV_rel_abund <- transform_sample_counts(PS.hell, function(x) x/sum(x))
-ASV_dataframe <- psmelt(ASV_rel_abund)
-rare_subset <- subset(ASV_dataframe, ASV_dataframe$Abundance < 0.01)
-
-Abund_rare <- aggregate(Abundance ~ sequence_ID + time_point + lake + organism_water + phy_group + 
-                     Phylum + Class + Order + Family +
-                     Genus + Species, data=rare_subset, FUN=mean)
-
-rare_genus <- ggplot(Abund.hell, aes(x = phy_group, y = Abundance, fill= Genus, color = Genus)) +
-  geom_bar(aes(fill = Genus, color = Genus), stat ="identity", position ="fill") +
-  xlab("Sampling Time Point") +
-  theme_bw() + theme(axis.text.x=element_text(size=17)) +
-  theme(axis.text.y=element_text(size=10)) +
-  theme(strip.text.y = element_text(size = 15)) 
-rare_genus
-dev.copy(pdf, "phyloseq analysis/figures/rare_genus.pdf", height=8, width=7)
-dev.off()
-
-rare_class <- ggplot(Abund_rare, aes(x = phy_group, y = Abundance, fill= Class, color = Class)) +
-  geom_bar(aes(fill = Class, color = Class), stat ="identity", position ="fill") +
-  xlab("Sampling Time Point") +
-  theme_bw() + theme(axis.text.x=element_text(size=17)) +
-  theme(axis.text.y=element_text(size=10)) +
-  theme(strip.text.y = element_text(size = 15)) 
-rare_class
-
-
-```
-
-
-```{r another way to categorize & plot rare taxa as a category with the rest}
-# testing something out from online
-physeq2 = filter_taxa(PS.500, function(x) mean (x) > 0.05, T)
-physeq3 = transform_sample_counts(physeq2, function(x) x/sum(x))
-abundance_df <- psmelt(physeq3)
-glom <- tax_glom(physeq3, taxrank = 'Family')
-glom_melt <- psmelt(glom)
-glom_melt$Family <- as.character(glom_melt$Family)
-glom_melt$Family[glom_melt$Abundance < 0.05] <- "<5% abund."
-rare_taxa <- subset(glom_melt, Family == "<5% abund.")
-num_unique_families <- length(unique(glom_melt$Family))
-unique_families <- unique(glom_melt$Family)
-num_rare <- length(unique(glom_melt$Family[glom_melt$Abundance < 0.05]))
-cat("Number of unique families:", num_unique_families, "\n")
-cat("Unique family names:", unique_families, "\n")
-glom_melt$Family <- factor(glom_melt$Family, levels = c("Candidatus Hepatincola", "Comamonadaceae", "Flavobacteriaceae", "Aeromonadaceae", 
-                                                        "Chitinibacteraceae", "Pseudomonadaceae", "Methylophilaceae", "Sporichthyaceae", "Spirosomaceae",
-                                                        "Chitinophagaceae", "Weeksellaceae", "T34", "Mycobacteriaceae", "Exiguobacteraceae", 
-                                                        "Moraxellaceae", "Clade III", "Lactobacillaceae", "Oxalobacteraceae", "Bacillaceae",            
-                                                        "Burkholderiaceae", "Methylacidiphilaceae", "Staphylococcaceae", "Verrucomicrobiaceae",
-                                                        "Enterobacteriaceae","env.OPS 17", "Crocinitomicaceae", "Listeriaceae",
-                                                        "Terrimicrobiaceae", "Cyanobiaceae", "Opitutaceae", "Enterococcaceae", "Rubritaleaceae",
-                                                        "Saprospiraceae", "Rhodobacteraceae", "<5% abund."))
-filtered_data <- glom_melt[glom_melt$Family == "<5% abund.", ]
-ggplot(filtered_data, aes(x = time_point, y = Abundance)) +
-  geom_bar(stat = "identity", fill = "gray") +
-  labs(title = "Rare Taxa: <5% Abundance",
-       x = "Samples", y = "Relative Abundance") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-glom_plot <- ggplot(data = glom_melt, aes(x = time_point, y=Abundance, fill = Family, color = Family)) +
-  geom_bar(aes(fill = Family, color = Family), stat ="identity", position ="fill") +
-  scale_fill_manual(values = c('turquoise','darkseagreen2', 'tan', 'orange', 'cornflowerblue', 
-                'magenta', 'darkolivegreen4', 'indianred1', 'tan4', 'darkblue', 
-                'mediumorchid1','firebrick4',  'yellowgreen', 'lightsalmon', 'tan3',
-                "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse', 
-                'seagreen1', 'moccasin', 'mediumvioletred', 'seagreen','cadetblue1',
-                "darkolivegreen1" ,"tan2" ,   "tomato3" , "#7CE3D8","gainsboro", "gold2", "chocolate", "darkgreen", "dodgerblue", "burlywood3", 'hotpink')) +
-  scale_color_manual(values = c('turquoise','darkseagreen2', 'tan', 'orange', 'cornflowerblue', 
-                'magenta', 'darkolivegreen4', 'indianred1', 'tan4', 'darkblue', 
-                'mediumorchid1','firebrick4',  'yellowgreen', 'lightsalmon', 'tan3',
-                "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse', 
-                'seagreen1', 'moccasin', 'mediumvioletred', 'seagreen','cadetblue1',
-                "darkolivegreen1" ,"tan2" ,   "tomato3" , "#7CE3D8","gainsboro", "gold2", "chocolate", "darkgreen", "dodgerblue", "burlywood3", 'hotpink')) +
-  xlab("Sampling Time Point") + theme(legend.position="bottom") + guides(fill=guide_legend(nrow=5))
-glom_plot
-dev.copy(pdf, "phyloseq analysis/figures/glom_plot.pdf", height=8, width=15)
-dev.off()
-```
-
-
 ```{r stacked bar plots}
 
-# trying something
-ASV_rel_abund_hell <- transform_sample_counts(PS.fin, function(x) x/sum(x))
-pm <- psmelt(ASV_rel_abund_hell)
-abund_plot <- pm %>%
-  dplyr::group_by(sample_type) %>%
-  mutate(tot = sum(Abundance)) %>%
-  group_by(Class, sample_type) %>%
-  summarise(rel_abund = sum(Abundance)/tot)
-
-########### plotting relative abundance, help from Megan
+########### plotting relative abundance, help from Megan Demmel, this is what I will use for analysis of relative abundances/ composition
 
 #ASV_rel_abund <- transform_sample_counts(PS.fin, function(x) x/sum(x))
 #pm <- psmelt(ASV_rel_abund)
@@ -1721,6 +1332,7 @@ View(Abund.final)
 
 Abund.final$Class[Abund.final$rel_abund <= 0.05] <- "Other (<5%)" # classes that have rel.abund less than 5% will be named as other
 
+# plot by sample type
 overall.comp.class <- ggplot(Abund.final, aes(x=phy_group, y=rel_abund, fill=Class, color=Class)) +
   geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
   xlab("Sample Type") +ylab("Relative Abundance (%)") + theme_bw() +
@@ -1732,19 +1344,7 @@ overall.comp.class
 dev.copy(pdf, "phyloseq analysis/figures/overall.comp.class.pdf", height=6, width=10)
 dev.off()
 
-
-time.class <- ggplot(Abund.final[Abund.final$sample_type=="Water",], aes(x=time_point, y=rel_abund, fill=Class, color=Class)) +
-  geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
-  ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
-  theme(axis.text.y=element_text(size=10)) +
-  theme(strip.text.y = element_text(size = 15)) + theme_bw() +
-  scale_fill_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "tan", "navy", "royalblue3", "tan4", "lightsalmon", "gray54")) +
-  scale_color_manual(values = c("red4", "orangered", "gold", "lightgreen", "turquoise3", "seagreen4", "lightskyblue", "tan", "navy", "royalblue3", "tan4", "lightsalmon", "gray54"))
-time.class
-dev.copy(pdf, "phyloseq analysis/figures/time.class.pdf", height=6, width=10)
-dev.off()
-
-
+# rel abund plot across time, lake, and sample type
 Facet <- ggplot(Abund.final, aes(x = time_point, y = rel_abund, fill= Class, color = Class)) +
   geom_bar(width = 0.8, aes(fill = Class, color = Class), stat ="identity", position = "fill") +
   facet_grid(cols = vars(lake), rows = vars(phy_group)) + xlab("Sampling Time Point") +  ylab("Relative Abundance (%)") +
@@ -1776,7 +1376,6 @@ my_order <- PS.fin %>%
 view(my_order)
 
 # plot
-
 overall.comp.class <- ggplot(my_class, aes(x=phy_group, y=Abundance, fill=Class, color=Class)) +
   geom_bar(aes(fill=Class, color=Class), stat="identity", position="fill") +
   ylab("Relative Abundance (%)") + theme(axis.text.x=element_text(size=12)) +
@@ -1823,60 +1422,102 @@ Facet
 dev.copy(pdf, "phyloseq analysis/figures/Facet.pdf", height=6, width=10)
 dev.off()
 
-# calculate
-sum.abund <- summaryBy(rel_abund ~ Class*phy_group, data = Abund.final, FUN = mean)
+```
 
 
+```{r testing effects of env. variables on rel. abund. and richness of dominant bacteria}
 
-# keep these plots for the hell of it
+# using Abund.final from the last code chunk
+# testing the effects of time, lake, and sample type on the 5 most dominant classes of bacteria
 
-phy_group_order <- ggplot(Abund500, aes(x = phy_group, y = Abundance, fill= Order, color = Order)) +
-  geom_bar(aes(fill = Order, color = Order), stat ="identity", position ="fill") +
-  xlab("Sample Type") + theme_bw() +
-  scale_fill_manual(values = c('turquoise','pink2', 'tan', 'orange', 'cornflowerblue', 
-                'magenta', 'darkolivegreen4', 'indianred1', 'tan4', 'darkblue', 
-                'mediumorchid1','firebrick4',  'yellowgreen', 'lightsalmon', 'tan3',
-                "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse', 
-                'seagreen1', 'moccasin', 'mediumvioletred', 'seagreen','cadetblue1',
-                "darkolivegreen1" ,"tan2" ,   "tomato3" , "#7CE3D8","gainsboro", "gold2", "chocolate", "darkgreen", "dodgerblue", "burlywood3", 'hotpink', 'yellow3', 'blue', 'pink', 'brown3')) +
-  scale_color_manual(values = c('turquoise','pink2', 'tan', 'orange', 'cornflowerblue', 
-                'magenta', 'darkolivegreen4', 'indianred1', 'tan4', 'darkblue', 
-                'mediumorchid1','firebrick4',  'yellowgreen', 'lightsalmon', 'tan3',
-                "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse', 
-                'seagreen1', 'moccasin', 'mediumvioletred', 'seagreen','cadetblue1',
-                "darkolivegreen1" ,"tan2" ,   "tomato3" , "#7CE3D8","gainsboro", "gold2", "chocolate", "darkgreen", "dodgerblue", "burlywood3", 'hotpink', 'yellow3', 'blue', 'pink', 'brown3'))
-phy_group_order            
-dev.copy(pdf, "phyloseq analysis/figures/phy_group_family .pdf", height=8, width=7)
+# GAMMAPROTEOBACTERIA
+gammaproteobacteria <- subset(Abund.final, Class == "Gammaproteobacteria")
+gammaproteobacteria <- summaryBy(rel_abund ~ sequence_ID, data = gammaproteobacteria, FUN = sum)
+gammaproteobacteria <- data.frame(gammaproteobacteria, row.names = gammaproteobacteria[,1])
+gammaproteobacteria <- merge(gammaproteobacteria, sample_data(PS.fin), by = "row.names")
+Anova(lm(rel_abund.sum ~ time_point + phy_group, data = gammaproteobacteria)) # time and phy
+
+# testing environmental effects on gamaproteobacteria abundances
+FitAll.gamma <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = gammaproteobacteria)
+step(FitAll.gamma, direction = "both")
+summary(lm(rel_abund.sum ~ DOC + elevation_m + cond + chla_ug.L, data = gammaproteobacteria)) # chlorophyll is significant but relies on other variables
+gamma_chla <- ggplot(gammaproteobacteria, aes(x=chla_ug.L, y=rel_abund.sum)) +
+  geom_point() +
+  geom_smooth() + xlab("Chlorophyll a (ug/L)") + ylab("Gammaproteobacteria Abundance") +
+  theme(axis.text.x=element_text(size=14)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=14)) + theme(axis.title.y=element_text(size=16))
+gamma_chla
+dev.copy(pdf, "phyloseq analysis/figures/gamma_chla.pdf", height=6, width=10)
+dev.off()
+
+gamma_chla <- ggscatter(gammaproteobacteria, x = "chla_ug.L", y = "rel_abund.sum",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.coeff.args = list( method = "pearson"),cor.coef.coord = c(0.0,0.98),
+          xlab = ("Chlorophyll a (ug/L)"), ylab = ("Gammaproteobacteria Abundance"))
+gamma_chla 
+dev.copy(pdf, "phyloseq analysis/figures/gamma_chla.pdf", height=6, width=10)
 dev.off()
 
 
-Facet500_genus <- ggplot(Abund.hell, aes(x = time_point, y = Abundance, fill= Genus)) +
-  geom_bar(aes(fill = Genus), stat ="identity", position ="fill") +
-  xlab("Sampling Time Point") + theme_bw()
-Facet500_genus
-dev.copy(pdf, "phyloseq analysis/figures/Facet500_order.pdf", height=10, width=5)
+# ALPHAPROTEOBACTERIA
+alphaproteobacteria <- subset(Abund.final, Class == "Alphaproteobacteria")
+alphaproteobacteria <- summaryBy(rel_abund ~ sequence_ID, data = alphaproteobacteria, FUN = sum)
+alphaproteobacteria <- data.frame(alphaproteobacteria, row.names = alphaproteobacteria[,1])
+alphaproteobacteria <- merge(alphaproteobacteria, sample_data(PS.fin), by = "row.names")
+Anova(lm(rel_abund.sum ~ lake + time_point + phy_group, data = alphaproteobacteria)) # time
+TukeyHSD(aov(lm(rel_abund.sum ~ lake + time_point + phy_group, data = alphaproteobacteria)))
+FitAll.alpha <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = alphaproteobacteria)
+step(FitAll.alpha, direction = "both") # chla
+summary(lm(rel_abund.sum ~ chla_ug.L, data = alphaproteobacteria)) #nope, chl a is not actually significant on its own
+
+
+#ACTINOBACTERIA
+actinobacteria <- subset(Abund.final, Class == "Actinobacteria")
+actinobacteria <- summaryBy(rel_abund ~ sequence_ID, data = actinobacteria, FUN = sum)
+actinobacteria <- data.frame(actinobacteria, row.names = actinobacteria[,1])
+actinobacteria <- merge(actinobacteria, sample_data(PS.fin), by = "row.names")
+Anova(lm(rel_abund.sum ~ lake*time_point*phy_group, data = actinobacteria)) # time
+act.aov <- aov(lm(rel_abund.sum ~ lake + time_point + phy_group, data = actinobacteria))
+TukeyHSD(act.aov)
+FitAll.actino <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = actinobacteria)
+step(FitAll.actino, direction = "both") # temp, DOm pH, cond, chl a
+summary(lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + cond + 
+    chla_ug.L, data = actinobacteria)) # temp, cond, chl a
+
+actino_DO <- ggplot(actinobacteria, aes(x=temp_C, y=rel_abund.sum)) +
+  geom_point() +
+  geom_smooth() + xlab("Dissolved Oxygen (%)") + ylab("Actinobacteria Abundance") +
+  theme(axis.text.x=element_text(size=14)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=14)) + theme(axis.title.y=element_text(size=16))
+actino_DO 
+dev.copy(pdf, "phyloseq analysis/figures/actino_DO.pdf", height=6, width=10)
 dev.off()
 
+actino_DO <- ggscatter(actinobacteria, x = "temp_C", y = "rel_abund.sum",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.coeff.args = list( method = "pearson"), cor.coef.coord = c(65,0.45),
+          xlab = ("Dissolved Oxygen (%)"), ylab = ("Actinobacteria Abundance"))
+actino_DO 
+dev.copy(pdf, "phyloseq analysis/figures/actino_DO.pdf", height=6, width=10)
+dev.off()
 
+# CYANOBACTERIA
+cyanobacteriia <- subset(Abund.final, Class == "Cyanobacteriia")
+cyanobacteriia <- summaryBy(rel_abund ~ sequence_ID, data = cyanobacteriia, FUN = sum)
+cyanobacteriia <- data.frame(cyanobacteriia, row.names = cyanobacteriia[,1])
+cyanobacteriia <- merge(cyanobacteriia, sample_data(PS.fin), by = "row.names")
+Anova(lm(rel_abund.sum ~ lake + time_point + phy_group, data = cyanobacteriia)) # time
+FitAll.cyano <- lm(rel_abund.sum ~ temp_C + DO_perc + pH + DOC + elevation_m + cond + chla_ug.L, data = cyanobacteriia)
+stepAIC(FitAll.cyano, direction = "both") # DOC
 
-################# subsetting
-# time point 1
-stacked2 <- ggplot(data=Abund[Abund$time_point=="1",], aes(x = lake, y = Abundance), fill = Phylum) +
-  geom_bar(aes(color = Phylum, fill = Phylum, ), stat ="identity", position ="fill") +
-  theme(legend.position="bottom") + guides(fill=guide_legend(nrow=7)) + 
-  facet_grid(~time_point, scales="free") + theme(axis.text.x = element_text(angle = 90))
-stacked2
-dev.copy(pdf, "phyloseq analysis/figures/stacked2.pdf", height=7, width=10)
-dev.off() 
-
-# by time_point for Blue
-stacked3 <- ggplot(data=Abund[Abund$lake =="Blue",], aes(x = lake, y = Abundance), fill = Phylum) +
-  geom_bar(aes(color = Phylum, fill = Phylum, ), stat ="identity", position ="fill") +
-  facet_grid(~time_point, scales="free")
-stacked3
-dev.copy(pdf, "phyloseq analysis/figures/stacked3.pdf", height=7, width=10)
-dev.off() 
-
-Abund.fa <- Abund[(Abund$Family=="Burkholderiales"),]
+# plot
+cyano_DOC <- ggplot(cyanobacteriia, aes(x=DOC, y=rel_abund.sum)) +
+  geom_point() +
+  geom_smooth() + xlab("DOC") + ylab("Cyanobacteria Abundance") +
+  theme(axis.text.x=element_text(size=14)) + theme(axis.title.x=element_text(size=16)) +
+  theme(axis.text.y=element_text(size=14)) + theme(axis.title.y=element_text(size=16))
+cyano_DOC
+dev.copy(pdf, "phyloseq analysis/figures/cyano_DOC.pdf", height=6, width=10)
+dev.off()
 
 ```
